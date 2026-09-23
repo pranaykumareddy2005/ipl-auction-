@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Auction Report — IPL 2026</title>
+<link rel="stylesheet" href="app.css">
+<style>
+  .wrap{max-width:1200px;margin:0 auto;padding:20px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .kpi b{font-size:24px;display:block} .kpi span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:1px}
+  .teams{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+  .tpanel{border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .thead{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;color:#08111f}
+  .thead b{font-size:16px} .thead .r{font-weight:800}
+  @media print{.noprint{display:none}body{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="row between center noprint">
+    <div class="brand"><div class="logo">IPL</div><div><small>Final Report</small><div style="font-weight:800">Auction 2026</div></div></div>
+    <div class="row" style="gap:8px">
+      <button class="btn sm" onclick="location.reload()">Refresh</button>
+      <button class="btn sm blue" onclick="window.print()">Print / PDF</button>
+      <button class="btn sm gold" onclick="downloadJSON()">Download JSON</button>
+      <button class="btn sm" onclick="downloadCSV()">Download CSV</button>
+    </div>
+  </div>
+
+  <h1 style="margin:18px 0 4px">Auction Report</h1>
+  <div class="mut" id="sub"></div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <h2 style="margin:10px 0">Top buys</h2>
+  <div class="panel" style="overflow:auto"><table id="topBuys"></table></div>
+
+  <h2 style="margin:20px 0 10px">Squads</h2>
+  <div class="teams" id="teams"></div>
+
+  <h2 style="margin:22px 0 10px">Unsold (<span id="unsoldN">0</span>)</h2>
+  <div class="panel" style="overflow:auto"><table id="unsold"></table></div>
+</div>
+
+<script src="bus.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+let R=null;
+async function load(){
+  R=await Bus.getJSON('/api/report');
+  $('sub').textContent=`${R.season} · generated ${new Date(R.generatedAt).toLocaleString()} · status ${R.phase}`;
+  $('kpis').innerHTML=[
+    ['Players sold',R.counts.sold],['Unsold',R.counts.unsold],
+    ['Total spend',Bus.fmtL(R.totalSpendL)],['Teams',R.teams.length],
+    ['Highest buy',R.topBuys[0]?Bus.fmtL(R.topBuys[0].priceL):'—'],
+  ].map(k=>`<div class="kpi"><b class="mono">${k[1]}</b><span>${k[0]}</span></div>`).join('');
+
+  $('topBuys').innerHTML='<thead><tr><th>#</th><th>Player</th><th>Role</th><th>Team</th><th style="text-align:right">Price</th></tr></thead><tbody>'+
+    R.topBuys.map((p,i)=>{const t=R.teams.find(t=>t.id===p.teamId);
+      return `<tr><td class="dim">${i+1}</td><td><b>${Bus.esc(p.name)}</b></td><td class="mut">${Bus.esc(p.role||'')}</td>
+      <td>${Bus.esc(t?t.name:'')}</td><td style="text-align:right" class="mono">${Bus.fmtL(p.priceL)}</td></tr>`;}).join('')+'</tbody>';
+
+  $('teams').innerHTML=R.teams.map(t=>`<div class="tpanel">
+    <div class="thead" style="background:${Bus.esc(t.color||'#888')}">
+      <div><b>${Bus.esc(t.name)}</b><div style="font-size:12px">${t.count} players · ${t.overseas} overseas</div></div>
+      <div style="text-align:right"><div class="r mono">${Bus.fmtL(t.spent)} spent</div><div style="font-size:12px">${Bus.fmtL(t.remaining)} left</div></div>
+    </div>
+    <table><tbody>${t.squad.length?t.squad.map(p=>`<tr><td>${Bus.esc(p.name)}${p.overseas?' <span class="tag" style="background:#20305f;color:#7aa9ff">OS</span>':''}</td>
+      <td class="mut">${Bus.esc(p.role||'')}</td><td style="text-align:right" class="mono">${Bus.fmtL(p.priceL)}</td></tr>`).join('')
+      :'<tr><td class="dim" colspan="3">No players.</td></tr>'}</tbody></table>
+  </div>`).join('');
+
+  $('unsoldN').textContent=R.unsold.length;
+  $('unsold').innerHTML='<tbody>'+(R.unsold.length?R.unsold.map(p=>`<tr><td>${Bus.esc(p.name)}</td><td class="mut">${Bus.esc(p.role||'')}</td>
+    <td class="mut">${Bus.esc(p.country||'')}</td><td style="text-align:right" class="mono">base ${Bus.fmtL(p.base)}</td></tr>`).join('')
+    :'<tr><td class="dim">None</td></tr>')+'</tbody>';
+}
+window.downloadJSON=()=>{ const b=new Blob([JSON.stringify(R,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='ipl-auction-2026-report.json';a.click(); };
+window.downloadCSV=()=>{
+  let rows=[['Team','Player','Role','Country','Overseas','Price(L)']];
+  R.teams.forEach(t=>t.squad.forEach(p=>rows.push([t.name,p.name,p.role||'',p.country||'',p.overseas?'Y':'N',p.priceL])));
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const b=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='ipl-auction-2026-squads.csv';a.click();
+};
+load();
+</script>
+</body>
+</html>

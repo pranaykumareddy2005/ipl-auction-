@@ -1,0 +1,10 @@
+# Runtime + secrets — never commit
+# team PINs + HMAC signing secret:
+data/access.json
+# live auction state (event log):
+data/events.log
+node_modules/
+*.bak
+*.tmp
+.DS_Store
+Thumbs.db

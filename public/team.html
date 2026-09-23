@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Team Console — IPL Auction 2026</title>
+<link rel="stylesheet" href="app.css">
+<style>
+  body{padding-bottom:112px}
+  .wrap{max-width:760px;margin:0 auto;padding:0 14px}
+  /* header */
+  .thead{position:sticky;top:0;z-index:15;display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:12px 14px;background:rgba(10,14,26,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  .thead::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
+    background:linear-gradient(90deg,transparent,var(--tc,var(--gold)),transparent)}
+  .tbadge{display:flex;align-items:center;gap:10px;min-width:0}
+  .tbadge .sw{width:30px;height:30px;border-radius:9px;flex:none;box-shadow:0 0 12px var(--tc)}
+  .tbadge .nm{font-family:var(--f-head);font-weight:600;font-size:17px;line-height:1;text-transform:uppercase;letter-spacing:.4px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tbadge .rm{font-size:12px;color:var(--gold);font-weight:700;margin-top:3px}
+  /* hero broadcast card */
+  .hero{position:relative;margin:16px 0;border-radius:22px;overflow:hidden;padding:20px 16px 18px;
+    border:1px solid var(--line);background:linear-gradient(160deg,var(--panel),var(--bg2));display:flex;flex-direction:column;align-items:center}
+  .hero::before{content:"";position:absolute;left:50%;top:34%;transform:translate(-50%,-50%);width:120%;height:150%;pointer-events:none;
+    background:radial-gradient(circle,rgba(90,210,255,.16),transparent 62%)}
+  .cornerTimer{position:absolute;top:10px;right:12px;text-align:center;z-index:4}
+  .ctlbl{font-family:var(--f-head);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--mut);margin-top:2px}
+  .ring{--p:0;width:66px;height:66px;border-radius:50%;display:grid;place-items:center;position:relative;
+    background:conic-gradient(var(--gold) calc(var(--p)*1%),#1a2344 0)}
+  .ring::before{content:"";position:absolute;inset:7px;border-radius:50%;background:var(--bg2)}
+  .ring b{position:relative;font-family:var(--f-display);font-size:26px}
+  .halo{position:relative;display:grid;place-items:center;flex:none;width:clamp(128px,38vw,180px);height:clamp(128px,38vw,180px);z-index:1}
+  .halo .hring{position:absolute;border-radius:50%;pointer-events:none}
+  .halo .r1{inset:0;border:2px dashed rgba(90,210,255,.55);box-shadow:0 0 20px rgba(90,210,255,.22),inset 0 0 20px rgba(90,210,255,.15);animation:spin 18s linear infinite}
+  .halo .r2{inset:8%;border:2px dotted rgba(245,197,66,.6);animation:spin 12s linear infinite reverse}
+  .halo .r3{inset:-6%;animation:spin 7s linear infinite;filter:blur(.4px);
+    background:conic-gradient(from 0deg,transparent 0 55deg,rgba(90,210,255,.65) 75deg,transparent 95deg 235deg,rgba(245,197,66,.65) 255deg,transparent 275deg);
+    -webkit-mask:radial-gradient(closest-side,transparent 79%,#000 81%);mask:radial-gradient(closest-side,transparent 79%,#000 81%)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .pphoto{width:66%;height:66%;border-radius:50%;flex:none;display:grid;place-items:center;overflow:hidden;position:relative;z-index:2;
+    background:linear-gradient(160deg,#12203f,#0a1020);
+    box-shadow:0 0 0 3px rgba(11,17,32,.9),0 0 0 5px rgba(245,197,66,.55),0 0 34px rgba(90,210,255,.35),0 14px 40px rgba(0,0,0,.55)}
+  .pphoto img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+  .pavatar{width:100%;height:100%;display:grid;place-items:center}
+  .pavatar.sil{color:#3a4a80}
+  .pname{font-family:var(--f-head);font-size:clamp(24px,6.6vw,40px);font-weight:700;line-height:1;margin:12px 0 0;text-transform:uppercase;letter-spacing:.5px;text-align:center;text-wrap:balance}
+  .pmeta{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-top:9px}
+  .pmeta .tag{font-size:12px;padding:4px 10px}
+  .lastside{margin-top:8px;color:var(--mut);font-family:var(--f-head);font-size:13px}
+  .lastside b{color:var(--gold)}
+  /* base / current bid bar */
+  .bcbar{display:grid;grid-template-columns:1fr 1fr;gap:1px;width:100%;margin-top:16px;border-radius:14px;overflow:hidden;
+    border:1px solid rgba(90,210,255,.3);background:rgba(90,210,255,.18)}
+  .bcp{padding:12px 10px;text-align:center;background:linear-gradient(180deg,#0e2338,#081729)}
+  .bcp.cur{background:linear-gradient(180deg,rgba(245,197,66,.12),#0c1c30)}
+  .bck{font-family:var(--f-head);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#7fb6d6}
+  .bcv{font-family:var(--f-display);font-size:clamp(24px,6vw,34px);line-height:1;margin-top:4px;font-variant-numeric:tabular-nums}
+  .bcv.gold{background:linear-gradient(120deg,#fff 20%,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 12px rgba(245,197,66,.3))}
+  .lead{font-family:var(--f-head);font-size:12px;margin-top:5px;text-transform:uppercase;letter-spacing:.4px;min-height:1.1em}
+  .lead.you{color:var(--green)} .lead.other{color:var(--mut)}
+  .statstrip{margin-top:12px;display:flex;flex-wrap:wrap;justify-content:center;border-radius:10px;overflow:hidden;border:1px solid var(--line2);background:#0b1a30;width:100%}
+  .statstrip .cell{padding:6px 12px;font-family:var(--f-head);border-right:1px solid var(--line);display:flex;gap:7px;align-items:baseline}
+  .statstrip .cell:last-child{border-right:none}
+  .statstrip .cell .k{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#7fb6d6}
+  .statstrip .cell .v{font-size:13px;color:var(--ink);font-weight:600}
+  /* KPIs */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .kpi{background:linear-gradient(160deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:12px;padding:11px 10px;text-align:center}
+  .kpi b{font-family:var(--f-head);font-size:clamp(15px,4.4vw,20px);font-weight:600;display:block;font-variant-numeric:tabular-nums}
+  .kpi span{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px}
+  .barwrap{margin-top:10px}
+  .bar{height:9px;border-radius:6px;background:#0d1428;overflow:hidden;border:1px solid var(--line)}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--green),var(--gold))}
+  .subline{color:var(--dim);font-size:12px;margin-top:6px}
+  /* sections */
+  .sec{margin-top:16px}
+  .sechd{font-family:var(--f-head);font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--mut);margin:0 2px 8px;font-weight:600}
+  .up{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;background:var(--panel)}
+  .up.first{border-color:rgba(245,197,66,.4);background:rgba(244,196,48,.08)}
+  .up .n{width:22px;color:var(--dim);font-weight:700;text-align:center}
+  .up .who{flex:1;font-weight:700;font-size:14px}
+  .up .role{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .up .base{color:var(--gold);font-weight:800;font-size:13px}
+  /* sticky bid bar */
+  .bidbar{position:fixed;left:0;right:0;bottom:0;z-index:30;padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg,rgba(9,13,26,.4),rgba(9,13,26,.96) 30%);backdrop-filter:blur(10px);border-top:1px solid var(--line)}
+  .bidbar .inner{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:12px}
+  .bidmeta{flex:none;min-width:96px}
+  .bidmeta .k{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--mut)}
+  .bidmeta .v{font-family:var(--f-display);font-size:22px;line-height:1;font-variant-numeric:tabular-nums}
+  .bidbtn{flex:1;padding:18px 14px;border-radius:14px;border:none;cursor:pointer;
+    font-family:var(--f-display);font-size:clamp(22px,6vw,30px);letter-spacing:1px;color:#20160a;
+    background:linear-gradient(135deg,var(--gold),var(--gold-2));box-shadow:0 8px 26px rgba(245,197,66,.4);
+    transition:transform .08s,filter .12s;font-variant-numeric:tabular-nums;line-height:1}
+  .bidbtn:hover:not(:disabled){filter:brightness(1.06)}
+  .bidbtn:active:not(:disabled){transform:translateY(2px)}
+  .bidbtn:disabled{background:#141c34;color:var(--dim);box-shadow:none;cursor:not-allowed;font-size:clamp(15px,4.4vw,19px)}
+  .bidbtn.lead{background:linear-gradient(135deg,var(--green),#1f9e52);color:#04240f}
+  /* login gate */
+  .gate{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:18px;
+    background:radial-gradient(900px 600px at 50% 30%,rgba(20,30,70,.96),rgba(4,7,16,.99))}
+  .gate .box{width:min(420px,94vw)}
+  .pinbig{font-family:var(--f-head);letter-spacing:6px;text-align:center;font-size:22px}
+  /* SOLD splash */
+  .soldsplash{position:fixed;inset:0;z-index:80;display:none;place-items:center;text-align:center;
+    background:radial-gradient(1000px 700px at 50% 40%,rgba(20,30,70,.96),rgba(4,7,16,.99))}
+  .soldsplash.show{display:grid;animation:pop .35s ease}
+  @keyframes pop{from{opacity:0}to{opacity:1}}
+  .soldsplash .inner{display:flex;flex-direction:column;align-items:center;gap:min(1.8vh,14px);padding:22px 16px}
+  .soldsplash .stamp{font-family:var(--f-display);font-size:min(15vw,12vh);letter-spacing:4px;line-height:1;color:var(--green);
+    text-shadow:0 0 40px currentColor;transform:rotate(-5deg);border:6px solid currentColor;border-radius:16px;padding:.04em .3em;animation:stamp .5s cubic-bezier(.2,1.4,.4,1)}
+  .soldsplash .stamp.unsold{color:var(--red)} .soldsplash .stamp.skipped{color:var(--gold)}
+  @keyframes stamp{0%{transform:rotate(-5deg) scale(1.6);opacity:0}60%{transform:rotate(-5deg) scale(.94)}100%{transform:rotate(-5deg) scale(1);opacity:1}}
+  .soldsplash #sp-photo{width:min(20vh,150px);height:min(20vh,150px);border-radius:50%;overflow:hidden;display:grid;place-items:center;
+    box-shadow:0 0 0 4px rgba(11,17,32,.9),0 0 0 6px rgba(245,197,66,.6),0 0 40px rgba(90,210,255,.3)}
+  .soldsplash #sp-photo img{width:100%;height:100%;object-fit:cover}
+  .soldsplash .sp-name{font-family:var(--f-head);font-weight:700;font-size:min(7vw,6vh);line-height:1;text-transform:uppercase}
+  .soldsplash .sp-to{font-size:min(3.2vw,2.4vh);color:var(--mut);letter-spacing:3px;text-transform:uppercase;font-weight:800}
+  .soldsplash .sp-team{font-family:var(--f-head);font-weight:600;font-size:min(6vw,5vh);line-height:1;text-transform:uppercase}
+  .soldsplash .sp-price{font-family:var(--f-display);font-size:min(11vw,10vh);line-height:1;background:linear-gradient(120deg,#fff 20%,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .soldsplash .sp-sub{font-size:min(4vw,3.4vh);color:var(--mut);font-weight:800}
+  .mine-flash{animation:mineglow 1.2s ease}
+  @keyframes mineglow{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 2px var(--green),0 0 30px rgba(53,214,122,.5)}}
+</style>
+</head>
+<body>
+<header class="thead" id="thead" style="display:none">
+  <div class="tbadge"><span class="sw" id="tsw"></span>
+    <div style="min-width:0"><div class="nm" id="tnm">—</div><div class="rm" id="trm"></div></div></div>
+  <div class="row center" style="gap:8px">
+    <span id="phase" class="pill setup"><span class="dot"></span><span id="phaseText">Setup</span></span>
+    <button class="btn sm ghost" onclick="logout()">Exit</button>
+  </div>
+</header>
+
+<div class="wrap" id="app" style="display:none">
+  <!-- HERO: current player -->
+  <div class="hero">
+    <div class="cornerTimer"><div class="ring" id="ring"><b id="ringnum">—</b></div><div class="ctlbl">on the clock</div></div>
+    <div class="halo">
+      <span class="hring r3"></span><span class="hring r1"></span><span class="hring r2"></span>
+      <div class="pphoto" id="pphoto"><div class="pavatar" id="pavatar">🏏</div></div>
+    </div>
+    <div class="pname" id="pname">Waiting for the next player…</div>
+    <div class="pmeta" id="pmeta"></div>
+    <div class="lastside" id="lastside"></div>
+    <div class="bcbar">
+      <div class="bcp"><div class="bck">Base Price</div><div class="bcv" id="baseVal">—</div></div>
+      <div class="bcp cur"><div class="bck">Current Bid</div><div class="bcv gold" id="bidVal">—</div>
+        <div class="lead" id="leadLine"></div></div>
+    </div>
+    <div class="statstrip" id="statStrip"></div>
+  </div>
+
+  <!-- YOUR NUMBERS -->
+  <div class="sec">
+    <div class="kpis">
+      <div class="kpi"><b id="kRem" class="mono">—</b><span>Purse Left</span></div>
+      <div class="kpi"><b id="kMax" class="mono">—</b><span>Max Bid</span></div>
+      <div class="kpi"><b id="kCnt">—</b><span>Squad</span></div>
+      <div class="kpi"><b id="kOs">—</b><span>Overseas</span></div>
+    </div>
+    <div class="barwrap"><div class="bar"><i id="barfill" style="width:0%"></i></div>
+      <div class="subline" id="pursesub"></div></div>
+  </div>
+
+  <!-- COMING UP -->
+  <div class="sec">
+    <div class="sechd">Coming up next (<span id="poolLeft">0</span> left)</div>
+    <div id="upnext"></div>
+  </div>
+
+  <!-- SQUAD -->
+  <div class="sec">
+    <div class="sechd">Your squad (<span id="squadn">0</span>)</div>
+    <div style="overflow:auto">
+      <table><thead><tr><th>#</th><th>Player</th><th>Role</th><th></th><th style="text-align:right">Price</th></tr></thead>
+      <tbody id="squad"><tr><td colspan="5" class="dim">No players yet.</td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- STICKY BID BAR -->
+<div class="bidbar" id="bidbar" style="display:none">
+  <div class="inner">
+    <div class="bidmeta"><div class="k">Current</div><div class="v" id="bidbarCur">—</div></div>
+    <button class="bidbtn" id="bidbtn" onclick="placeBid()">—</button>
+  </div>
+</div>
+
+<!-- LOGIN GATE -->
+<div class="gate" id="gate">
+  <div class="panel box">
+    <div class="brand" style="margin-bottom:14px"><div class="logo">IPL</div>
+      <div><small>Team Console · 2026</small><div class="brandttl">Sign in to bid</div></div></div>
+    <label>Your franchise</label>
+    <select id="gTeam"></select>
+    <label style="margin-top:12px">Team PIN</label>
+    <input id="gPin" class="pinbig" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn green" style="width:100%;margin-top:14px" onclick="doLogin()">Join &amp; bid →</button>
+    <div class="err" id="gErr" style="color:#ffb3c2;font-size:13px;margin-top:10px;min-height:1.1em;font-weight:600"></div>
+    <p class="dim" style="font-size:12px;margin:12px 0 0">Ask the operator for your team PIN. You can still raise your card in the room.</p>
+  </div>
+</div>
+
+<!-- SOLD splash -->
+<div class="soldsplash" id="soldsplash"><div class="inner">
+  <div class="stamp" id="sp-stamp">SOLD</div>
+  <div id="sp-photo"></div>
+  <div class="sp-name" id="sp-name"></div>
+  <div class="sp-to" id="sp-to">sold to</div>
+  <div class="sp-team" id="sp-team"></div>
+  <div class="sp-price" id="sp-price"></div>
+  <div class="sp-sub" id="sp-sub"></div>
+</div></div>
+
+<script src="bus.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+// Safe wrappers — localStorage throws in private mode / when storage is blocked.
+const LS={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+let myTeam = LS.get('ipl_team_id'); myTeam = myTeam===null?null:Number(myTeam);
+const tokKey = id => 'ipl_team_token_'+id;
+let token = myTeam!=null ? (LS.get(tokKey(myTeam))||null) : null;
+let snap=null, cats=null;
+
+/* ---------- boot ---------- */
+Bus.getJSON('/api/players').then(d=>{cats=d.cats;if(snap)render(snap);});
+Bus.connect(render, on=>Bus.connBadge(on));
+
+function loggedIn(){ return myTeam!=null && token; }
+
+function render(s){
+  snap=s;
+  if(!loggedIn()){ showGate(s); return; }
+  const t=s.teams.find(x=>x.teamId===myTeam);
+  if(!t){ showGate(s); return; }
+  $('gate').style.display='none';
+  $('thead').style.display=''; $('app').style.display=''; $('bidbar').style.display='';
+
+  // header
+  document.documentElement.style.setProperty('--tc', t.color||'#f5c542');
+  $('tsw').style.background=t.color||'#888';
+  $('tnm').textContent=t.name;
+  $('trm').textContent=Bus.fmtL(t.remaining)+' left';
+  $('phase').className='pill '+s.phase;
+  $('phaseText').textContent={setup:'Setup',live:'Live',paused:'Paused',complete:'Complete'}[s.phase]||s.phase;
+
+  renderHero(s);
+  renderNumbers(s,t);
+  renderUpNext(s);
+  renderSquad(t);
+  renderBidBar(s,t);
+  tick(); checkResult(s);
+}
+
+/* ---------- hero (current player) ---------- */
+function renderHero(s){
+  const p=s.current, b=s.bidding;
+  if(p){
+    $('pname').textContent=p.name;
+    const catColor='#'+((p.cat&&cats&&cats[p.cat])?cats[p.cat].c:'888');
+    const overseas=p.country&&p.country!=='India';
+    const meta=[`<span class="tag" style="background:${catColor}22;color:${catColor}">${Bus.esc(p.role||'')}</span>`];
+    if(p.country) meta.push(`<span class="tag" style="background:#20305f;color:#bcd">${Bus.esc(p.country)}</span>`);
+    if(overseas) meta.push(`<span class="tag" style="background:rgba(77,141,255,.18);color:#85b0ff">Overseas</span>`);
+    $('pmeta').innerHTML=meta.join('');
+    $('lastside').innerHTML=(p.star&&p.star.team)?`Last IPL side · <b>${Bus.esc(p.star.team)}</b>`:'';
+    $('baseVal').textContent=Bus.fmtL(p.base);
+    setPhoto(p,catColor);
+    const st=p.stats; let cells;
+    if(st&&Object.keys(st).length){
+      cells=[['CAREER','IPL']];
+      if(st.matches!=null)cells.push(['MTS',st.matches]);
+      if(st.runs!=null)cells.push(['RUNS',st.runs]);
+      if(st.average!=null)cells.push(['AVG',st.average]);
+      if(st.strike_rate!=null)cells.push(['SR',st.strike_rate]);
+      if(st.wickets!=null)cells.push(['WKTS',st.wickets]);
+      if(st.economy!=null)cells.push(['ECON',st.economy]);
+      if(st.rating!=null)cells.push(['RATING',st.rating]);
+    } else {
+      const catLbl=(p.cat&&cats&&cats[p.cat])?cats[p.cat].label:'';
+      cells=[['LOT',String(p.sr).padStart(3,'0')],['TYPE',catLbl],['STATUS',p.cu||'—']];
+    }
+    $('statStrip').innerHTML=cells.map(c=>`<div class="cell"><span class="k">${Bus.esc(c[0])}</span><span class="v">${Bus.esc(c[1])}</span></div>`).join('');
+  } else {
+    $('pname').textContent = s.phase==='complete'?'🏆 Auction Complete':(s.phase==='setup'?'Auction not started':'Waiting for the next player…');
+    $('pmeta').innerHTML=''; $('lastside').innerHTML=''; $('baseVal').textContent='—'; $('statStrip').innerHTML='';
+    $('pphoto').innerHTML='<div class="pavatar sil">'+SIL+'</div>';
+  }
+  // current bid
+  if(b&&b.currentBidL!=null){
+    $('bidVal').textContent=Bus.fmtL(b.currentBidL); bumpBid(b.currentBidL);
+    const mine=b.leadingTeamId===myTeam;
+    const lt=s.teams.find(x=>x.teamId===b.leadingTeamId);
+    $('leadLine').textContent = mine?'🔨 YOU are leading':(lt?('🔨 '+lt.name):'');
+    $('leadLine').className='lead '+(mine?'you':'other');
+  } else if(b){
+    $('bidVal').textContent=Bus.fmtL(b.baseL); $('leadLine').textContent='Opening bid'; $('leadLine').className='lead other'; prevBid=null;
+  } else { $('bidVal').textContent='—'; $('leadLine').textContent=''; prevBid=null; }
+}
+
+/* ---------- your numbers ---------- */
+function renderNumbers(s,t){
+  $('kRem').textContent=Bus.fmtL(t.remaining);
+  $('kMax').textContent=Bus.fmtL(t.maxBidL);
+  $('kCnt').textContent=t.count+' / '+s.settings.squadMax;
+  $('kOs').textContent=t.overseas+' / '+s.settings.overseasMax;
+  const total=t.base+t.adjust;
+  $('barfill').style.width=Math.max(0,Math.min(100,total?(t.spent/total*100):0))+'%';
+  $('pursesub').textContent=`Budget ${Bus.fmtL(total)}${t.adjust?` (adj ${Bus.fmtL(t.adjust)})`:''} · ${t.slotsLeft} slots left`;
+}
+
+/* ---------- coming up ---------- */
+function renderUpNext(s){
+  $('poolLeft').textContent=s.counts.pool;
+  const q=s.queuePreview||[];
+  $('upnext').innerHTML = q.length ? q.slice(0,8).map((p,i)=>`<div class="up ${i===0?'first':''}">
+    <span class="n">${i+1}</span>
+    <span class="who">${Bus.esc(p.name)}${i===0?' <span class="tag" style="background:rgba(244,196,48,.2);color:var(--gold)">NEXT</span>':''}
+      <div class="role">${Bus.esc(p.role||'')}${p.country?(' · '+Bus.esc(p.country)):''}</div></span>
+    <span class="base">${Bus.fmtL(p.base)}</span></div>`).join('')
+    : `<div class="dim" style="padding:10px">${s.phase==='complete'?'Auction complete.':'No more players queued.'}</div>`;
+}
+
+/* ---------- squad ---------- */
+function renderSquad(t){
+  const sq=t.squad||[];
+  $('squadn').textContent=sq.length;
+  $('squad').innerHTML=sq.length?sq.map((p,i)=>`<tr><td class="dim">${i+1}</td><td>${Bus.esc(p.name)}</td>
+    <td class="mut">${Bus.esc(p.role||'')}</td><td>${p.overseas?'<span class="tag" style="background:#20305f;color:#7aa9ff">OS</span>':''}</td>
+    <td style="text-align:right" class="mono">${Bus.fmtL(p.priceL)}</td></tr>`).join('')
+    :'<tr><td colspan="5" class="dim">No players yet.</td></tr>';
+}
+
+/* ---------- sticky bid bar ---------- */
+function renderBidBar(s,t){
+  const b=s.bidding, p=s.current;
+  $('bidbarCur').textContent = (b&&b.currentBidL!=null)?Bus.fmtL(b.currentBidL):(b?Bus.fmtL(b.baseL):'—');
+  const canPhase = s.phase==='live' && b && p;
+  const leading = b && b.leadingTeamId===myTeam;
+  const osPlayer = p && p.country && p.country!=='India';
+  const overCap = osPlayer && t.overseas>=s.settings.overseasMax;
+  const nextAmt = b ? b.nextMinL : 0;
+  const afford = b ? (t.maxBidL>=nextAmt && t.slotsLeft>0 && !overCap) : false;
+  const btn=$('bidbtn');
+  let disabled=true, label='—', cls='';
+  if(!canPhase){ label = s.phase==='complete'?'Auction complete':(s.phase==='paused'?'Auction paused':'Waiting for a player'); }
+  else if(leading){ cls='lead'; label='🔨 YOU LEAD'; }
+  else if(t.slotsLeft<=0){ label='Squad full'; }
+  else if(overCap){ label='Overseas limit'; }
+  else if(!afford){ label="Can't afford"; }
+  else { disabled=false; label='BID '+Bus.fmtL(nextAmt); }
+  btn.disabled=disabled || bidBusy; btn.className='bidbtn '+cls; if(!bidBusy) btn.textContent=label;
+}
+
+let bidBusy=false;
+window.placeBid=async()=>{
+  if(bidBusy) return; bidBusy=true;
+  const btn=$('bidbtn'); btn.disabled=true; btn.textContent='…';
+  const expectedSr = (snap && snap.current) ? snap.current.sr : null;
+  const r=await Bus.teamBid(token, null, expectedSr); bidBusy=false;
+  if(!r.ok){
+    if(/expired|logged in|PIN/i.test(r.error||'')){ token=null; LS.del(tokKey(myTeam)); }
+    Bus.toast(r.error||'Bid rejected','err');
+  } else { Bus.toast('Bid placed! 🔨','ok'); }
+  if(snap) render(snap);
+};
+
+/* ---------- login gate ---------- */
+function showGate(s){
+  $('thead').style.display='none'; $('app').style.display='none'; $('bidbar').style.display='none';
+  $('gate').style.display='grid';
+  const teams=(s&&s.teams)||[];
+  const cur=$('gTeam').value;
+  $('gTeam').innerHTML = teams.length ? teams.map(t=>`<option value="${t.teamId}">${Bus.esc(t.name)}</option>`).join('')
+    : '<option value="">No teams yet — ask the operator</option>';
+  if(cur) $('gTeam').value=cur; else if(myTeam!=null && teams.find(t=>t.teamId===myTeam)) $('gTeam').value=myTeam;
+}
+window.doLogin=async()=>{
+  if($('gTeam').value===''){ $('gErr').textContent='No teams configured yet.'; return; }
+  const teamId=Number($('gTeam').value), pin=$('gPin').value.trim();
+  if(!pin){ $('gErr').textContent='Enter your team PIN.'; return; }
+  $('gErr').textContent='Checking…';
+  const r=await Bus.teamLogin(teamId,pin);
+  if(!r.ok){ $('gErr').textContent=r.error||'Login failed.'; return; }
+  myTeam=teamId; token=r.token;
+  LS.set('ipl_team_id',teamId); LS.set(tokKey(teamId),token);
+  $('gPin').value=''; if(snap) render(snap);
+};
+window.logout=()=>{ if(myTeam!=null) LS.del(tokKey(myTeam)); token=null; if(snap) showGate(snap); };
+
+/* ---------- photo (identical behaviour to the presentation screen) ---------- */
+const SIL='<svg viewBox="0 0 24 24" fill="currentColor" style="width:52%;height:52%"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.4 0-9 2.2-9 5.2V22h18v-2.8C21 16.2 16.4 14 12 14Z"/></svg>';
+function fillPhoto(box,color,photo){
+  box.innerHTML='';
+  const ph=document.createElement('div'); ph.className='pavatar sil'; ph.style.color=color||'#3a4a80'; ph.innerHTML=SIL; box.appendChild(ph);
+  if(photo){ const img=new Image(); img.onload=()=>{box.innerHTML='';box.appendChild(img);}; img.onerror=()=>{}; img.src=photo; }
+}
+function setPhoto(p,color){ fillPhoto($('pphoto'),color||'#3a4a80',p.photo); }
+
+let prevBid=null;
+function bumpBid(v){ if(v!=null&&v!==prevBid){ const el=$('bidVal'); el.style.transform='scale(1.08)'; setTimeout(()=>el.style.transform='',180);
+  // flash the bid bar green if it's now us leading
+  if(snap&&snap.bidding&&snap.bidding.leadingTeamId===myTeam){ const bb=$('bidbar'); bb.classList.remove('mine-flash'); void bb.offsetWidth; bb.classList.add('mine-flash'); } }
+  prevBid=v; }
+
+/* ---------- timer ---------- */
+let endsAt=null,dur=0;
+function tick(){ const t=snap&&snap.timer; if(t&&t.running&&t.remainingMs>0){endsAt=Date.now()+t.remainingMs;dur=t.durationMs;} else if(!(t&&t.running)){endsAt=null;} }
+setInterval(()=>{ const ring=$('ring'),num=$('ringnum'); if(!ring)return;
+  if(endsAt){ const rem=Math.max(0,endsAt-Date.now()); const sec=Math.ceil(rem/1000); num.textContent=sec;
+    ring.style.setProperty('--p',dur?(rem/dur*100):0); ring.style.filter=sec<=5?'drop-shadow(0 0 10px #e63946)':'none'; }
+  else { num.textContent='—'; ring.style.setProperty('--p',0); ring.style.filter='none'; } },120);
+
+/* ---------- SOLD / UNSOLD / SKIPPED splash ---------- */
+let lastResTs=0, splashT=null;
+function checkResult(s){
+  const r=s.lastResult; if(!r) return;
+  if(r.ts===lastResTs) return;
+  const fresh=(Date.now()-r.ts)<8000; lastResTs=r.ts; if(!fresh) return;
+  const col=r.kind==='sold'?'#2ec46a':(r.kind==='unsold'?'#e63946':'#f4c430');
+  const stamp=$('sp-stamp'); stamp.className='stamp '+r.kind;
+  stamp.textContent=r.kind==='sold'?'SOLD':(r.kind==='unsold'?'UNSOLD':'SKIPPED');
+  fillPhoto($('sp-photo'), r.teamColor||col, r.photo);
+  $('sp-name').textContent=r.name;
+  const sold=r.kind==='sold';
+  $('sp-to').style.display=sold?'':'none'; $('sp-team').style.display=sold?'':'none'; $('sp-price').style.display=sold?'':'none';
+  $('sp-sub').style.display=sold?'none':'';
+  if(sold){
+    const toMe=r.teamId===myTeam;
+    $('sp-to').textContent=toMe?'YOU WON 🎉':'sold to';
+    $('sp-team').textContent=r.teamName||''; $('sp-team').style.color=r.teamColor||'#fff';
+    $('sp-price').textContent=Bus.fmtL(r.priceL);
+  } else { $('sp-sub').textContent=r.kind==='unsold'?'went unsold':'set aside — will return later'; }
+  const el=$('soldsplash'); el.classList.add('show');
+  clearTimeout(splashT); splashT=setTimeout(()=>el.classList.remove('show'), sold?4200:2600);
+}
+</script>
+</body>
+</html>

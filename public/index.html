@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>IPL Auction 2026 — Sign in</title>
+<link rel="stylesheet" href="app.css">
+<style>
+  body{min-height:100dvh;display:grid;place-items:center;padding:24px 16px;overflow-x:hidden}
+  .shell{width:min(1120px,100%);display:grid;grid-template-columns:1.05fr .95fr;
+    border:1px solid var(--line);border-radius:24px;overflow:hidden;
+    background:linear-gradient(180deg,var(--panel),var(--bg2));box-shadow:0 40px 120px rgba(0,0,0,.55)}
+  @media(max-width:900px){.shell{grid-template-columns:1fr;max-width:520px}}
+
+  /* ---------- left / brand ---------- */
+  .brandcol{position:relative;padding:44px 40px;overflow:hidden;
+    background:
+      radial-gradient(600px 380px at 12% 8%, rgba(245,197,66,.16), transparent 60%),
+      radial-gradient(620px 460px at 92% 100%, rgba(90,210,255,.16), transparent 62%),
+      linear-gradient(160deg,#111a34,#0b1226)}
+  .brandcol::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background-image:linear-gradient(rgba(255,255,255,.028) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.028) 1px,transparent 1px);
+    background-size:34px 34px;mask-image:radial-gradient(80% 70% at 30% 20%,#000,transparent)}
+  @media(max-width:900px){.brandcol{padding:34px 26px 26px}}
+  .brandcol > *{position:relative;z-index:1}
+  .kicker{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-head);font-weight:600;
+    font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);
+    border:1px solid rgba(245,197,66,.35);border-radius:999px;padding:6px 12px;background:rgba(245,197,66,.06)}
+  .kicker .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 1.6s infinite}
+  .title{font-family:var(--f-display);font-size:clamp(46px,6vw,78px);line-height:.9;letter-spacing:1px;text-transform:uppercase;margin:26px 0 0;
+    background:linear-gradient(120deg,#fff 26%,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{color:var(--mut);font-size:15px;line-height:1.65;max-width:44ch;margin-top:16px}
+  .feats{list-style:none;padding:0;margin:26px 0 0;display:grid;gap:12px}
+  .feats li{display:flex;gap:12px;align-items:flex-start;font-size:14px;color:var(--ink)}
+  .feats .fi{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:15px;
+    background:rgba(255,255,255,.05);border:1px solid var(--line2)}
+  .feats small{display:block;color:var(--mut);font-size:12.5px;margin-top:2px;line-height:1.45}
+  .stats{display:flex;gap:26px;margin-top:32px;padding-top:22px;border-top:1px solid var(--line)}
+  .stat b{font-family:var(--f-head);font-weight:600;font-size:26px;color:var(--ink);display:block;line-height:1;font-variant-numeric:tabular-nums}
+  .stat span{font-size:10.5px;text-transform:uppercase;letter-spacing:1.2px;color:var(--mut)}
+
+  /* ---------- right / sign-in ---------- */
+  .signcol{padding:44px 40px;display:flex;flex-direction:column;justify-content:center;gap:6px;background:rgba(9,13,26,.35)}
+  @media(max-width:900px){.signcol{padding:26px}}
+  .signhd{font-family:var(--f-head);font-weight:600;font-size:22px;letter-spacing:.3px}
+  .signsub{color:var(--mut);font-size:13.5px;margin:4px 0 18px}
+  .roles{display:grid;gap:10px}
+  .role{display:flex;align-items:center;gap:14px;text-align:left;padding:15px 16px;border-radius:14px;cursor:pointer;
+    border:1px solid var(--line);background:linear-gradient(180deg,var(--panel2),var(--panel));
+    transition:transform .12s,border-color .12s,box-shadow .12s;position:relative}
+  .role:hover{transform:translateY(-2px);border-color:var(--ac)}
+  .role.on{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac),0 14px 34px rgba(0,0,0,.4)}
+  .role .ric{flex:none;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;
+    background:rgba(255,255,255,.04);border:1px solid var(--line2);color:var(--ac)}
+  .role h3{margin:0;font-family:var(--f-head);font-weight:600;font-size:16px;letter-spacing:.3px}
+  .role p{margin:3px 0 0;color:var(--mut);font-size:12px;line-height:1.4}
+  .role .arrow{margin-left:auto;color:var(--dim);font-size:20px;transition:transform .12s,color .12s}
+  .role:hover .arrow,.role.on .arrow{color:var(--ac);transform:translateX(3px)}
+  .adm{--ac:var(--gold)} .pres{--ac:var(--blue)} .team{--ac:var(--green)}
+
+  .panelform{margin-top:4px;border:1px solid var(--line2);border-radius:14px;padding:16px;
+    background:#0a1224;display:none}
+  .panelform.show{display:block;animation:slide .22s ease}
+  @keyframes slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+  .frow{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .frow .grow{flex:1;min-width:150px}
+  .pin{font-family:var(--f-head);letter-spacing:6px;text-align:center;font-size:20px}
+  .err{color:#ffb3c2;font-size:12.5px;margin-top:9px;min-height:1.05em;font-weight:600}
+  .foot{margin-top:22px;color:var(--dim);font-size:12px;line-height:1.6;border-top:1px solid var(--line);padding-top:16px}
+  .foot b{color:var(--mut);font-weight:700}
+</style>
+</head>
+<body>
+<div class="shell">
+  <!-- LEFT: brand -->
+  <section class="brandcol">
+    <span class="kicker"><span class="dot"></span> Live · Season 2026</span>
+    <div class="brand" style="margin-top:22px">
+      <div class="logo">IPL</div>
+      <div><small>College Auction League</small><div class="brandttl">Auction Control</div></div>
+    </div>
+    <h1 class="title">The Big<br>Auction</h1>
+    <p class="lede">A server-authoritative live auction. One console drives the room, the big screen tells the story,
+      and every franchise bids in real time — from a phone or by raising a card.</p>
+    <ul class="feats">
+      <li><span class="fi">🎛️</span><div><b>Total control</b><small>Present players, register bids, sell, hold, undo — every action is audited.</small></div></li>
+      <li><span class="fi">📺</span><div><b>Broadcast screen</b><small>Halo player cards, live bid, countdown and purses for the whole room.</small></div></li>
+      <li><span class="fi">📱</span><div><b>Bid from anywhere</b><small>Each team signs in with a PIN and bids live, budget-checked to the last lakh.</small></div></li>
+    </ul>
+    <div class="stats">
+      <div class="stat"><b id="sPlayers">—</b><span>Players</span></div>
+      <div class="stat"><b id="sTeams">—</b><span>Teams</span></div>
+      <div class="stat"><b id="sPhase">—</b><span>Status</span></div>
+    </div>
+  </section>
+
+  <!-- RIGHT: sign in -->
+  <section class="signcol">
+    <div class="signhd">Sign in to continue</div>
+    <div class="signsub">Choose your role for tonight's auction.</div>
+
+    <div class="roles">
+      <div class="role adm" id="r-admin" onclick="pick('admin')">
+        <div class="ric">🎛️</div>
+        <div><h3>Admin</h3><p>Run the auction. Requires the operator key.</p></div>
+        <span class="arrow">→</span>
+      </div>
+      <div class="panelform" id="f-admin">
+        <label>Operator key</label>
+        <div class="frow">
+          <input class="grow" id="opKey" type="password" placeholder="Enter operator key" onkeydown="if(event.key==='Enter')goAdmin()">
+          <button class="btn gold" onclick="goAdmin()">Enter →</button>
+        </div>
+        <div class="err" id="admErr"></div>
+      </div>
+
+      <div class="role pres" id="r-pres" onclick="pick('pres')">
+        <div class="ric">📺</div>
+        <div><h3>Presentation</h3><p>The big broadcast screen. No sign-in needed.</p></div>
+        <span class="arrow">→</span>
+      </div>
+
+      <div class="role team" id="r-team" onclick="pick('team')">
+        <div class="ric">👥</div>
+        <div><h3>Team</h3><p>Bid live &amp; track your squad. Requires your team PIN.</p></div>
+        <span class="arrow">→</span>
+      </div>
+      <div class="panelform" id="f-team">
+        <div class="frow">
+          <div class="grow"><label>Your franchise</label><select id="teamSel"></select></div>
+          <div style="width:130px"><label>Team PIN</label>
+            <input id="teamPin" class="pin" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••"
+              onkeydown="if(event.key==='Enter')goTeam()"></div>
+        </div>
+        <button class="btn green" style="width:100%;margin-top:12px" onclick="goTeam()">Join &amp; bid →</button>
+        <div class="err" id="teamErr"></div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <span id="statline">Loading auction…</span><br>
+      <b>Tip:</b> Presentation on the projector · Admin on the operator's laptop · Team on each table's phone.
+    </div>
+  </section>
+</div>
+
+<script src="bus.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const LS={set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+let teams=[];
+
+async function boot(){
+  try{
+    const s=await Bus.getJSON('/api/state');
+    teams=s.teams||[];
+    $('teamSel').innerHTML=teams.length
+      ? teams.map(t=>`<option value="${t.teamId}">${Bus.esc(t.name)}</option>`).join('')
+      : `<option value="">No teams yet — ask the admin</option>`;
+    $('sPlayers').textContent=s.totalPlayers ?? '—';
+    $('sTeams').textContent=teams.length;
+    $('sPhase').textContent=({setup:'Setup',live:'Live',paused:'Paused',complete:'Done'}[s.phase]||s.phase);
+    $('statline').textContent=`${s.totalPlayers} players · ${teams.length} teams · status: ${s.phase}`;
+  }catch(e){ $('statline').textContent='Cannot reach the server — is it running?'; }
+}
+
+window.pick=(role)=>{
+  ['admin','pres','team'].forEach(r=>$('r-'+r).classList.toggle('on',r===role));
+  $('f-admin').classList.toggle('show',role==='admin');
+  $('f-team').classList.toggle('show',role==='team');
+  if(role==='pres'){ location.href='presentation.html'; return; }
+  if(role==='admin') setTimeout(()=>$('opKey').focus(),60);
+  if(role==='team') setTimeout(()=>$('teamPin').focus(),60);
+};
+
+window.goAdmin=async()=>{
+  const key=$('opKey').value.trim();
+  if(!key){ $('admErr').textContent='Enter the operator key.'; return; }
+  $('admErr').textContent='Checking…';
+  try{
+    const r=await fetch('/api/team-codes',{headers:{'x-op-key':key}});
+    if(r.status===401){ $('admErr').textContent='Wrong operator key.'; return; }
+    LS.set('ipl_op_key',key);
+    location.href='operator.html';
+  }catch(e){ $('admErr').textContent='Network error — is the server running?'; }
+};
+
+window.goTeam=async()=>{
+  if($('teamSel').value===''){ $('teamErr').textContent='No teams configured yet.'; return; }
+  const teamId=Number($('teamSel').value), pin=$('teamPin').value.trim();
+  if(!pin){ $('teamErr').textContent='Enter your team PIN.'; return; }
+  $('teamErr').textContent='Checking…';
+  const r=await Bus.teamLogin(teamId,pin);
+  if(!r.ok){ $('teamErr').textContent=r.error||'Login failed.'; return; }
+  LS.set('ipl_team_id',teamId);
+  LS.set('ipl_team_token_'+teamId,r.token);
+  location.href='team.html';
+};
+
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "ipl-auction",
+  "version": "1.0.0",
+  "description": "Server-authoritative, event-sourced live IPL-style auction console for physical events",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "simulate": "node scripts/simulate.js",
+    "test": "node scripts/simulate.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {}
+}
