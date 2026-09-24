@@ -6,11 +6,14 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
+    "db:init": "node scripts/db-init.js",
     "simulate": "node scripts/simulate.js",
     "test": "node scripts/simulate.js"
   },
   "engines": {
     "node": ">=18"
   },
-  "dependencies": {}
+  "dependencies": {
+    "pg": "^8.23.0"
+  }
 }

@@ -1,8 +1,14 @@
 # Runtime + secrets — never commit
-# team PINs + HMAC signing secret:
+# environment / DB credentials:
+.env
+.env.*
+!.env.example
+# team PINs + HMAC signing secret (legacy single-room):
 data/access.json
-# live auction state (event log):
+# live auction state (legacy single-room event log):
 data/events.log
+# per-room local storage (when running file-backed):
+data/rooms/
 node_modules/
 *.bak
 *.tmp

@@ -150,6 +150,19 @@
   #sp-photo{border-radius:50%;border:none;overflow:hidden;
     box-shadow:0 0 0 4px rgba(11,17,32,.9),0 0 0 6px rgba(245,197,66,.6),0 0 40px rgba(90,210,255,.3),0 16px 44px rgba(0,0,0,.6)}
   #sp-photo img{border-radius:50%}
+  /* discreet room-code label */
+  .roomtag{position:fixed;left:12px;bottom:10px;z-index:40;font-family:var(--f-head);font-size:11px;
+    letter-spacing:1.5px;text-transform:uppercase;color:var(--mut);background:rgba(10,14,26,.72);
+    border:1px solid var(--line);border-radius:8px;padding:4px 10px;backdrop-filter:blur(6px)}
+  .roomtag b{color:var(--gold);font-weight:700}
+  /* no-room fallback card */
+  .noroom{position:fixed;inset:0;display:grid;place-items:center;padding:24px;text-align:center;
+    background:radial-gradient(900px 600px at 50% 30%,rgba(20,30,70,.96),rgba(4,7,16,.99))}
+  .noroom .card{max-width:420px;background:linear-gradient(160deg,var(--panel),var(--bg2));
+    border:1px solid var(--line);border-radius:18px;padding:28px 26px}
+  .noroom h2{font-family:var(--f-head);margin:0 0 10px}
+  .noroom p{color:var(--mut);margin:0 0 18px}
+  .noroom a{color:var(--gold);font-weight:700;text-decoration:none}
 </style>
 </head>
 <body>
@@ -213,6 +226,8 @@
   </div>
 </div>
 
+<div class="roomtag" id="roomtag" style="display:none">Room <b id="roomtagCode"></b></div>
+
 <script src="bus.js"></script>
 <script>
 const $=id=>document.getElementById(id);
@@ -263,6 +278,9 @@ function render(s){
   const ph=s.phase;
   $('phase').className='pill '+ph;
   $('phaseText').textContent={setup:'Setup',live:'Live',paused:'Paused',complete:'Complete'}[ph]||ph;
+  { let el=document.getElementById('resultsCta');
+    if(ph==='complete'){ if(!el){ el=document.createElement('div'); el.id='resultsCta'; el.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:80;text-align:center;padding:16px;background:linear-gradient(90deg,#f5c542,#e0a91f);color:#0b1020;font-weight:800;font-size:20px'; document.body.appendChild(el);} el.textContent='🏆 Full results & downloads → '+location.host+'/report.html?room='+Bus.ROOM; }
+    else if(el){ el.remove(); } }
   $('round').textContent=(s.round==='unsold'?'Unsold Round':'Main Round');
   $('progress').textContent=`Sold ${s.counts.sold} · Unsold ${s.counts.unsold} · Left ${s.counts.pool}`;
 
@@ -432,9 +450,20 @@ setInterval(()=>{
   } else { num.textContent='—'; ring.style.setProperty('--p',0); ring.style.filter='none'; lastSec=null; }
 },100);
 
-// load category colors
-Bus.getJSON('/api/players').then(d=>{window.__cats=d.cats;if(snap)render(snap);});
-Bus.connect(render, on=>Bus.connBadge(on));
+// ===== boot: require a room in the URL =====
+if(!Bus.ROOM){
+  document.body.innerHTML='<div class="noroom"><div class="card">'
+    +'<div class="brand" style="justify-content:center;margin-bottom:14px"><div class="logo">IPL</div>'
+    +'<div><small>Live Auction · 2026</small><div style="font-weight:800">Broadcast screen</div></div></div>'
+    +'<h2>No auction selected</h2>'
+    +'<p>Add <code>?room=CODE</code> to the address to view a live auction.</p>'
+    +'<a href="index.html">← Back to auctions</a></div></div>';
+} else {
+  $('roomtag').style.display=''; $('roomtagCode').textContent=Bus.ROOM;
+  // load category colors (global config)
+  Bus.getJSON('/api/players').then(d=>{window.__cats=d.cats;if(snap)render(snap);}).catch(()=>{});
+  Bus.connect(render, on=>Bus.connBadge(on));
+}
 </script>
 </body>
 </html>

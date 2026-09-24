@@ -1,6 +1,12 @@
-// Shared client helpers: SSE state stream, command POST, formatting.
+// Shared client helpers for the MULTI-ROOM platform.
+// Every auction page carries its room in the URL: ?room=CODE. All room API calls
+// and the SSE stream are scoped to that code. The landing page has no room and
+// uses createRoom()/roomInfo().
 (function (g) {
   'use strict';
+
+  const ROOM = (new URLSearchParams(location.search).get('room') || '').toUpperCase();
+  const base = () => '/api/room/' + ROOM;
 
   function fmtL(L) {
     L = Number(L) || 0;
@@ -9,49 +15,70 @@
   }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
-  // Connect to the authoritative state stream. onState(snapshot) fires on every change.
+  async function getJSON(url) { const r = await fetch(url); return r.json(); }
+
+  // ---- room lifecycle (landing page) ----
+  async function createRoom(name) {
+    try {
+      const r = await fetch('/api/rooms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+      return await r.json();
+    } catch (e) { return { ok: false, error: 'Network error — is the server running?' }; }
+  }
+  async function roomInfo(code) {
+    try { const r = await fetch('/api/rooms/' + encodeURIComponent(code)); return await r.json(); }
+    catch (e) { return { ok: false, error: 'Network error' }; }
+  }
+
+  // ---- live state for the current room ----
   function connect(onState, onConn) {
     let es;
     function open() {
-      es = new EventSource('/api/stream');
+      es = new EventSource(base() + '/stream');
       es.onopen = () => onConn && onConn(true);
       es.onmessage = (e) => { try { onState(JSON.parse(e.data)); } catch (err) {} };
-      es.onerror = () => { onConn && onConn(false); /* EventSource auto-reconnects */ };
+      es.onerror = () => { onConn && onConn(false); };
     }
     open();
     return { close: () => es && es.close() };
   }
+  function state() { return getJSON(base() + '/state'); }
 
-  // Fire an operator command. Returns {ok,error?}.
+  // ---- auctioneer command (host key) ----
   async function command(name, payload, opKey) {
     try {
-      const r = await fetch('/api/command', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-op-key': opKey || '' },
+      const r = await fetch(base() + '/command', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-op-key': opKey || '' },
         body: JSON.stringify({ name, payload: payload || {} }),
       });
       return await r.json();
     } catch (e) { return { ok: false, error: 'Network error — is the server running?' }; }
   }
 
-  async function getJSON(url) { const r = await fetch(url); return r.json(); }
-
-  // Team web-bidding. login -> {ok, token}; bid uses that bearer token.
-  async function teamLogin(teamId, code) {
+  // ---- team join (FCFS claim, no PIN) + bidding ----
+  async function claimTeam(teamId) {
     try {
-      const r = await fetch('/api/team/login', {
+      const r = await fetch(base() + '/team/claim', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId, code }),
+        body: JSON.stringify({ teamId }),
       });
       return await r.json();
     } catch (e) { return { ok: false, error: 'Network error — is the server running?' }; }
+  }
+  async function releaseTeam(teamId, opKey) {
+    try {
+      const r = await fetch(base() + '/team/release', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-op-key': opKey || '' },
+        body: JSON.stringify({ teamId }),
+      });
+      return await r.json();
+    } catch (e) { return { ok: false, error: 'Network error' }; }
   }
   async function teamBid(token, amountL, expectedSr) {
     const body = {};
     if (amountL != null) body.amountL = amountL;
     if (expectedSr != null) body.expectedSr = expectedSr;
     try {
-      const r = await fetch('/api/team/bid', {
+      const r = await fetch(base() + '/team/bid', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-team-token': token || '' },
         body: JSON.stringify(body),
       });
@@ -68,7 +95,6 @@
     clearTimeout(toastT);
     toastT = setTimeout(() => { el.className = 'toast ' + (kind || ''); }, 2600);
   }
-
   function connBadge(on) {
     let el = document.querySelector('.conn');
     if (!el) { el = document.createElement('div'); el.className = 'conn'; document.body.appendChild(el); }
@@ -76,5 +102,11 @@
     el.textContent = on ? '● live' : '○ reconnecting…';
   }
 
-  g.Bus = { fmtL, esc, connect, command, getJSON, teamLogin, teamBid, toast, connBadge };
+  g.Bus = {
+    ROOM, base, fmtL, esc, getJSON,
+    createRoom, roomInfo,
+    connect, state, command,
+    claimTeam, releaseTeam, teamBid,
+    toast, connBadge,
+  };
 })(window);

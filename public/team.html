@@ -96,11 +96,6 @@
   .bidbtn:active:not(:disabled){transform:translateY(2px)}
   .bidbtn:disabled{background:#141c34;color:var(--dim);box-shadow:none;cursor:not-allowed;font-size:clamp(15px,4.4vw,19px)}
   .bidbtn.lead{background:linear-gradient(135deg,var(--green),#1f9e52);color:#04240f}
-  /* login gate */
-  .gate{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:18px;
-    background:radial-gradient(900px 600px at 50% 30%,rgba(20,30,70,.96),rgba(4,7,16,.99))}
-  .gate .box{width:min(420px,94vw)}
-  .pinbig{font-family:var(--f-head);letter-spacing:6px;text-align:center;font-size:22px}
   /* SOLD splash */
   .soldsplash{position:fixed;inset:0;z-index:80;display:none;place-items:center;text-align:center;
     background:radial-gradient(1000px 700px at 50% 40%,rgba(20,30,70,.96),rgba(4,7,16,.99))}
@@ -129,7 +124,7 @@
     <div style="min-width:0"><div class="nm" id="tnm">—</div><div class="rm" id="trm"></div></div></div>
   <div class="row center" style="gap:8px">
     <span id="phase" class="pill setup"><span class="dot"></span><span id="phaseText">Setup</span></span>
-    <button class="btn sm ghost" onclick="logout()">Exit</button>
+    <button class="btn sm ghost" onclick="leave()">Leave</button>
   </div>
 </header>
 
@@ -188,22 +183,6 @@
   </div>
 </div>
 
-<!-- LOGIN GATE -->
-<div class="gate" id="gate">
-  <div class="panel box">
-    <div class="brand" style="margin-bottom:14px"><div class="logo">IPL</div>
-      <div><small>Team Console · 2026</small><div class="brandttl">Sign in to bid</div></div></div>
-    <label>Your franchise</label>
-    <select id="gTeam"></select>
-    <label style="margin-top:12px">Team PIN</label>
-    <input id="gPin" class="pinbig" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••"
-      onkeydown="if(event.key==='Enter')doLogin()">
-    <button class="btn green" style="width:100%;margin-top:14px" onclick="doLogin()">Join &amp; bid →</button>
-    <div class="err" id="gErr" style="color:#ffb3c2;font-size:13px;margin-top:10px;min-height:1.1em;font-weight:600"></div>
-    <p class="dim" style="font-size:12px;margin:12px 0 0">Ask the operator for your team PIN. You can still raise your card in the room.</p>
-  </div>
-</div>
-
 <!-- SOLD splash -->
 <div class="soldsplash" id="soldsplash"><div class="inner">
   <div class="stamp" id="sp-stamp">SOLD</div>
@@ -220,32 +199,48 @@
 const $=id=>document.getElementById(id);
 // Safe wrappers — localStorage throws in private mode / when storage is blocked.
 const LS={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
-let myTeam = LS.get('ipl_team_id'); myTeam = myTeam===null?null:Number(myTeam);
-const tokKey = id => 'ipl_team_token_'+id;
-let token = myTeam!=null ? (LS.get(tokKey(myTeam))||null) : null;
-let snap=null, cats=null;
 
-/* ---------- boot ---------- */
-Bus.getJSON('/api/players').then(d=>{cats=d.cats;if(snap)render(snap);});
-Bus.connect(render, on=>Bus.connBadge(on));
+/* ---------- multi-room session ---------- */
+const TKEY='ipl_team_'+Bus.ROOM, IDKEY='ipl_teamid_'+Bus.ROOM;
+let myTeam=null, token=null, snap=null, cats=null;
+function clearSession(){ LS.del(TKEY); LS.del(IDKEY); token=null; }
+function toJoin(){ clearSession(); location.replace('join.html?room='+encodeURIComponent(Bus.ROOM)); }
+window.leave=()=>{ clearSession(); location.href='join.html?room='+encodeURIComponent(Bus.ROOM); };
 
-function loggedIn(){ return myTeam!=null && token; }
+function boot(){
+  if(!Bus.ROOM){ location.replace('index.html'); return false; }
+  token=LS.get(TKEY);
+  myTeam=Number(LS.get(IDKEY));
+  if(!token){ location.replace('join.html?room='+encodeURIComponent(Bus.ROOM)); return false; }
+  return true;
+}
+if(boot()){
+  Bus.getJSON('/api/players').then(d=>{cats=d.cats;if(snap)render(snap);}).catch(()=>{});
+  Bus.connect(render, on=>Bus.connBadge(on));
+}
 
+let _lastRev=-1,_lastPhase='';
 function render(s){
   snap=s;
-  if(!loggedIn()){ showGate(s); return; }
+  // team removed (or session no longer valid) -> back to join
   const t=s.teams.find(x=>x.teamId===myTeam);
-  if(!t){ showGate(s); return; }
-  $('gate').style.display='none';
+  if(!t){ toJoin(); return; }
+  tick(); checkResult(s);            // always: timer countdown + SOLD/UNSOLD splash stay live
+  if(s.rev===_lastRev && s.phase===_lastPhase) return; // skip heavy rebuild on unchanged ticks
+  _lastRev=s.rev; _lastPhase=s.phase;
   $('thead').style.display=''; $('app').style.display=''; $('bidbar').style.display='';
 
   // header
   document.documentElement.style.setProperty('--tc', t.color||'#f5c542');
   $('tsw').style.background=t.color||'#888';
   $('tnm').textContent=t.name;
-  $('trm').textContent=Bus.fmtL(t.remaining)+' left';
+  $('trm').textContent='Room '+Bus.ROOM+' · '+Bus.fmtL(t.remaining)+' left';
   $('phase').className='pill '+s.phase;
   $('phaseText').textContent={setup:'Setup',live:'Live',paused:'Paused',complete:'Complete'}[s.phase]||s.phase;
+  { let el=document.getElementById('resultsCta');
+    if(s.phase==='complete'){ if(!el){ el=document.createElement('a'); el.id='resultsCta'; el.href='report.html?room='+Bus.ROOM;
+      el.textContent='🏆 View & download final results'; el.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:80;text-align:center;padding:14px 16px;background:linear-gradient(90deg,#f5c542,#e0a91f);color:#0b1020;font-weight:800;text-decoration:none;box-shadow:0 -6px 20px rgba(0,0,0,.4)'; document.body.appendChild(el);} }
+    else if(el){ el.remove(); } }
 
   renderHero(s);
   renderNumbers(s,t);
@@ -362,34 +357,11 @@ window.placeBid=async()=>{
   const expectedSr = (snap && snap.current) ? snap.current.sr : null;
   const r=await Bus.teamBid(token, null, expectedSr); bidBusy=false;
   if(!r.ok){
-    if(/expired|logged in|PIN/i.test(r.error||'')){ token=null; LS.del(tokKey(myTeam)); }
+    if(/session expired|rejoin/i.test(r.error||'')){ toJoin(); return; }
     Bus.toast(r.error||'Bid rejected','err');
-  } else { Bus.toast('Bid placed! 🔨','ok'); }
+  } else { Bus.toast(r.warning ? ('⚠ '+r.warning) : 'Bid placed! 🔨', r.warning?'err':'ok'); }
   if(snap) render(snap);
 };
-
-/* ---------- login gate ---------- */
-function showGate(s){
-  $('thead').style.display='none'; $('app').style.display='none'; $('bidbar').style.display='none';
-  $('gate').style.display='grid';
-  const teams=(s&&s.teams)||[];
-  const cur=$('gTeam').value;
-  $('gTeam').innerHTML = teams.length ? teams.map(t=>`<option value="${t.teamId}">${Bus.esc(t.name)}</option>`).join('')
-    : '<option value="">No teams yet — ask the operator</option>';
-  if(cur) $('gTeam').value=cur; else if(myTeam!=null && teams.find(t=>t.teamId===myTeam)) $('gTeam').value=myTeam;
-}
-window.doLogin=async()=>{
-  if($('gTeam').value===''){ $('gErr').textContent='No teams configured yet.'; return; }
-  const teamId=Number($('gTeam').value), pin=$('gPin').value.trim();
-  if(!pin){ $('gErr').textContent='Enter your team PIN.'; return; }
-  $('gErr').textContent='Checking…';
-  const r=await Bus.teamLogin(teamId,pin);
-  if(!r.ok){ $('gErr').textContent=r.error||'Login failed.'; return; }
-  myTeam=teamId; token=r.token;
-  LS.set('ipl_team_id',teamId); LS.set(tokKey(teamId),token);
-  $('gPin').value=''; if(snap) render(snap);
-};
-window.logout=()=>{ if(myTeam!=null) LS.del(tokKey(myTeam)); token=null; if(snap) showGate(snap); };
 
 /* ---------- photo (identical behaviour to the presentation screen) ---------- */
 const SIL='<svg viewBox="0 0 24 24" fill="currentColor" style="width:52%;height:52%"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.4 0-9 2.2-9 5.2V22h18v-2.8C21 16.2 16.4 14 12 14Z"/></svg>';

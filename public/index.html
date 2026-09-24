@@ -3,201 +3,357 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>IPL Auction 2026 — Sign in</title>
+<title>IPL Auction 2026 — Live Auction Platform</title>
 <link rel="stylesheet" href="app.css">
 <style>
-  body{min-height:100dvh;display:grid;place-items:center;padding:24px 16px;overflow-x:hidden}
-  .shell{width:min(1120px,100%);display:grid;grid-template-columns:1.05fr .95fr;
-    border:1px solid var(--line);border-radius:24px;overflow:hidden;
-    background:linear-gradient(180deg,var(--panel),var(--bg2));box-shadow:0 40px 120px rgba(0,0,0,.55)}
-  @media(max-width:900px){.shell{grid-template-columns:1fr;max-width:520px}}
+  html{scroll-behavior:smooth}
+  @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+  body{overflow-x:hidden}
+  .wrap{width:min(1160px,100%);margin:0 auto;padding:0 24px}
+  @media(max-width:640px){.wrap{padding:0 16px}}
+  section{position:relative}
 
-  /* ---------- left / brand ---------- */
-  .brandcol{position:relative;padding:44px 40px;overflow:hidden;
+  /* ---------- sticky nav ---------- */
+  .nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(12px);
+    background:rgba(9,13,26,.72);border-bottom:1px solid var(--line)}
+  .nav .wrap{display:flex;align-items:center;gap:18px;height:66px}
+  .nav .links{display:flex;gap:22px;margin-left:14px}
+  .nav .links a{color:var(--mut);text-decoration:none;font-size:14px;font-weight:600;transition:color .15s}
+  .nav .links a:hover{color:var(--ink)}
+  .nav .navcta{margin-left:auto;display:flex;gap:10px}
+  @media(max-width:760px){.nav .links{display:none}.nav .navcta .btn.ghost{display:none}}
+  .brand .logo{cursor:pointer}
+
+  /* ---------- hero ---------- */
+  .hero{position:relative;padding:84px 0 72px;overflow:hidden;text-align:center;
     background:
-      radial-gradient(600px 380px at 12% 8%, rgba(245,197,66,.16), transparent 60%),
-      radial-gradient(620px 460px at 92% 100%, rgba(90,210,255,.16), transparent 62%),
-      linear-gradient(160deg,#111a34,#0b1226)}
-  .brandcol::after{content:"";position:absolute;inset:0;pointer-events:none;
-    background-image:linear-gradient(rgba(255,255,255,.028) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.028) 1px,transparent 1px);
-    background-size:34px 34px;mask-image:radial-gradient(80% 70% at 30% 20%,#000,transparent)}
-  @media(max-width:900px){.brandcol{padding:34px 26px 26px}}
-  .brandcol > *{position:relative;z-index:1}
+      radial-gradient(760px 480px at 20% -10%, rgba(245,197,66,.16), transparent 60%),
+      radial-gradient(760px 560px at 88% 20%, rgba(90,210,255,.16), transparent 62%),
+      linear-gradient(180deg,#0d1428,var(--bg2))}
+  .hero::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+    background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+    background-size:38px 38px;mask-image:radial-gradient(70% 60% at 50% 0%,#000,transparent)}
+  .hero .wrap{position:relative;z-index:1}
   .kicker{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-head);font-weight:600;
     font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);
     border:1px solid rgba(245,197,66,.35);border-radius:999px;padding:6px 12px;background:rgba(245,197,66,.06)}
   .kicker .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 1.6s infinite}
-  .title{font-family:var(--f-display);font-size:clamp(46px,6vw,78px);line-height:.9;letter-spacing:1px;text-transform:uppercase;margin:26px 0 0;
-    background:linear-gradient(120deg,#fff 26%,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
-  .lede{color:var(--mut);font-size:15px;line-height:1.65;max-width:44ch;margin-top:16px}
-  .feats{list-style:none;padding:0;margin:26px 0 0;display:grid;gap:12px}
-  .feats li{display:flex;gap:12px;align-items:flex-start;font-size:14px;color:var(--ink)}
-  .feats .fi{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:15px;
-    background:rgba(255,255,255,.05);border:1px solid var(--line2)}
-  .feats small{display:block;color:var(--mut);font-size:12.5px;margin-top:2px;line-height:1.45}
-  .stats{display:flex;gap:26px;margin-top:32px;padding-top:22px;border-top:1px solid var(--line)}
-  .stat b{font-family:var(--f-head);font-weight:600;font-size:26px;color:var(--ink);display:block;line-height:1;font-variant-numeric:tabular-nums}
-  .stat span{font-size:10.5px;text-transform:uppercase;letter-spacing:1.2px;color:var(--mut)}
+  .htitle{font-family:var(--f-display);font-size:clamp(44px,7.4vw,92px);line-height:.92;letter-spacing:1px;
+    text-transform:uppercase;margin:24px auto 0;max-width:14ch;
+    background:linear-gradient(120deg,#fff 30%,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hsub{color:var(--mut);font-size:clamp(15px,1.8vw,18px);line-height:1.65;max-width:56ch;margin:20px auto 0}
+  .hcta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:30px}
+  .trust{display:flex;gap:26px;justify-content:center;flex-wrap:wrap;margin-top:42px;
+    padding-top:26px;border-top:1px solid var(--line)}
+  .trust .stat b{font-family:var(--f-head);font-weight:600;font-size:26px;color:var(--ink);display:block;line-height:1;font-variant-numeric:tabular-nums}
+  .trust .stat span{font-size:10.5px;text-transform:uppercase;letter-spacing:1.2px;color:var(--mut)}
 
-  /* ---------- right / sign-in ---------- */
-  .signcol{padding:44px 40px;display:flex;flex-direction:column;justify-content:center;gap:6px;background:rgba(9,13,26,.35)}
-  @media(max-width:900px){.signcol{padding:26px}}
-  .signhd{font-family:var(--f-head);font-weight:600;font-size:22px;letter-spacing:.3px}
-  .signsub{color:var(--mut);font-size:13.5px;margin:4px 0 18px}
-  .roles{display:grid;gap:10px}
-  .role{display:flex;align-items:center;gap:14px;text-align:left;padding:15px 16px;border-radius:14px;cursor:pointer;
-    border:1px solid var(--line);background:linear-gradient(180deg,var(--panel2),var(--panel));
-    transition:transform .12s,border-color .12s,box-shadow .12s;position:relative}
-  .role:hover{transform:translateY(-2px);border-color:var(--ac)}
-  .role.on{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac),0 14px 34px rgba(0,0,0,.4)}
-  .role .ric{flex:none;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;
-    background:rgba(255,255,255,.04);border:1px solid var(--line2);color:var(--ac)}
-  .role h3{margin:0;font-family:var(--f-head);font-weight:600;font-size:16px;letter-spacing:.3px}
-  .role p{margin:3px 0 0;color:var(--mut);font-size:12px;line-height:1.4}
-  .role .arrow{margin-left:auto;color:var(--dim);font-size:20px;transition:transform .12s,color .12s}
-  .role:hover .arrow,.role.on .arrow{color:var(--ac);transform:translateX(3px)}
-  .adm{--ac:var(--gold)} .pres{--ac:var(--blue)} .team{--ac:var(--green)}
+  .seclbl{font-family:var(--f-head);font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);text-align:center}
+  .sechd{font-family:var(--f-head);font-weight:600;font-size:clamp(26px,3.6vw,40px);text-align:center;margin:10px 0 0;letter-spacing:.3px}
+  .secsub{color:var(--mut);text-align:center;max-width:60ch;margin:14px auto 0;font-size:15px;line-height:1.6}
 
-  .panelform{margin-top:4px;border:1px solid var(--line2);border-radius:14px;padding:16px;
-    background:#0a1224;display:none}
-  .panelform.show{display:block;animation:slide .22s ease}
+  /* ---------- get started ---------- */
+  .start{padding:72px 0}
+  .startcard{max-width:560px;margin:34px auto 0}
+  .tabs{display:flex;gap:8px;background:var(--panel2);border:1px solid var(--line2);border-radius:12px;padding:6px}
+  .tabs button{flex:1;background:transparent;border:none;color:var(--mut);font-family:var(--f-head);
+    font-weight:600;font-size:13px;letter-spacing:.4px;padding:10px;border-radius:8px;cursor:pointer;transition:all .15s}
+  .tabs button.on{background:linear-gradient(135deg,var(--gold),var(--gold-2));color:#20160a}
+  .pane{display:none;margin-top:18px}
+  .pane.on{display:block;animation:slide .22s ease}
   @keyframes slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+  .pane p.hint{color:var(--mut);font-size:13px;margin:0 0 12px;line-height:1.5}
   .frow{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
   .frow .grow{flex:1;min-width:150px}
-  .pin{font-family:var(--f-head);letter-spacing:6px;text-align:center;font-size:20px}
-  .err{color:#ffb3c2;font-size:12.5px;margin-top:9px;min-height:1.05em;font-weight:600}
-  .foot{margin-top:22px;color:var(--dim);font-size:12px;line-height:1.6;border-top:1px solid var(--line);padding-top:16px}
-  .foot b{color:var(--mut);font-weight:700}
+  input{width:100%}
+  .err{color:#ffb3c2;font-size:12.5px;margin-top:10px;min-height:1.05em;font-weight:600}
+
+  /* ---------- how it works ---------- */
+  .how{padding:72px 0;background:linear-gradient(180deg,transparent,rgba(9,13,26,.4),transparent)}
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:40px}
+  @media(max-width:860px){.steps{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:480px){.steps{grid-template-columns:1fr}}
+  .step{position:relative}
+  .step .n{font-family:var(--f-display);font-size:40px;line-height:1;color:transparent;-webkit-text-stroke:1.5px var(--line2)}
+  .step .si{font-size:26px;margin:8px 0 10px}
+  .step h4{margin:0;font-family:var(--f-head);font-weight:600;font-size:16px}
+  .step p{margin:6px 0 0;color:var(--mut);font-size:13px;line-height:1.55}
+
+  /* ---------- features ---------- */
+  .features{padding:72px 0}
+  .fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:40px}
+  @media(max-width:860px){.fgrid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.fgrid{grid-template-columns:1fr}}
+  .fcard{padding:22px;transition:transform .15s,border-color .15s}
+  .fcard:hover{transform:translateY(-3px);border-color:var(--line2)}
+  .fcard .fi{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;
+    background:rgba(255,255,255,.04);border:1px solid var(--line2);margin-bottom:14px}
+  .fcard h4{margin:0;font-family:var(--f-head);font-weight:600;font-size:16px;letter-spacing:.2px}
+  .fcard p{margin:8px 0 0;color:var(--mut);font-size:13.5px;line-height:1.6}
+
+  /* ---------- cta band ---------- */
+  .band{padding:64px 0}
+  .bandbox{border:1px solid rgba(245,197,66,.3);border-radius:22px;padding:48px 32px;text-align:center;
+    background:
+      radial-gradient(500px 300px at 50% -20%, rgba(245,197,66,.14), transparent 60%),
+      linear-gradient(180deg,var(--panel2),var(--panel))}
+  .bandbox h3{font-family:var(--f-head);font-weight:600;font-size:clamp(22px,3vw,32px);margin:0}
+  .bandbox p{color:var(--mut);margin:12px auto 0;max-width:48ch;font-size:15px;line-height:1.6}
+
+  /* ---------- footer ---------- */
+  footer{border-top:1px solid var(--line);padding:34px 0;margin-top:20px}
+  footer .wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap;color:var(--dim);font-size:13px}
+  footer .fspacer{margin-left:auto}
 </style>
 </head>
 <body>
-<div class="shell">
-  <!-- LEFT: brand -->
-  <section class="brandcol">
-    <span class="kicker"><span class="dot"></span> Live · Season 2026</span>
-    <div class="brand" style="margin-top:22px">
+
+<!-- ===== NAV ===== -->
+<nav class="nav">
+  <div class="wrap">
+    <div class="brand" onclick="scrollTop()">
       <div class="logo">IPL</div>
-      <div><small>College Auction League</small><div class="brandttl">Auction Control</div></div>
+      <div><small>Auction League</small><div class="brandttl">Auction 2026</div></div>
     </div>
-    <h1 class="title">The Big<br>Auction</h1>
-    <p class="lede">A server-authoritative live auction. One console drives the room, the big screen tells the story,
-      and every franchise bids in real time — from a phone or by raising a card.</p>
-    <ul class="feats">
-      <li><span class="fi">🎛️</span><div><b>Total control</b><small>Present players, register bids, sell, hold, undo — every action is audited.</small></div></li>
-      <li><span class="fi">📺</span><div><b>Broadcast screen</b><small>Halo player cards, live bid, countdown and purses for the whole room.</small></div></li>
-      <li><span class="fi">📱</span><div><b>Bid from anywhere</b><small>Each team signs in with a PIN and bids live, budget-checked to the last lakh.</small></div></li>
-    </ul>
-    <div class="stats">
-      <div class="stat"><b id="sPlayers">—</b><span>Players</span></div>
-      <div class="stat"><b id="sTeams">—</b><span>Teams</span></div>
-      <div class="stat"><b id="sPhase">—</b><span>Status</span></div>
+    <div class="links">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
     </div>
-  </section>
+    <div class="navcta">
+      <button class="btn ghost sm" onclick="openStart('join')">Join</button>
+      <button class="btn gold sm" onclick="openStart('create')">Create room</button>
+    </div>
+  </div>
+</nav>
 
-  <!-- RIGHT: sign in -->
-  <section class="signcol">
-    <div class="signhd">Sign in to continue</div>
-    <div class="signsub">Choose your role for tonight's auction.</div>
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="wrap">
+    <span class="kicker"><span class="dot"></span> Live · Season 2026</span>
+    <h1 class="htitle">Run your own IPL auction, live.</h1>
+    <p class="hsub">Spin up a room, share one link, and every franchise bids in real time — from a phone or by
+      raising a card. Server-authoritative, budget-checked to the last lakh, and built for the big screen.</p>
+    <div class="hcta">
+      <button class="btn gold lg" onclick="openStart('create')">Create a room →</button>
+      <button class="btn ghost lg" onclick="openStart('join')">Join with code</button>
+    </div>
+    <div class="trust">
+      <div class="stat"><b>Real-time</b><span>Live SSE updates</span></div>
+      <div class="stat"><b>No PINs</b><span>First-come team claim</span></div>
+      <div class="stat"><b>3 roles</b><span>Host · Team · Screen</span></div>
+    </div>
+  </div>
+</section>
 
-    <div class="roles">
-      <div class="role adm" id="r-admin" onclick="pick('admin')">
-        <div class="ric">🎛️</div>
-        <div><h3>Admin</h3><p>Run the auction. Requires the operator key.</p></div>
-        <span class="arrow">→</span>
+<!-- ===== GET STARTED ===== -->
+<section class="start" id="start">
+  <div class="wrap">
+    <div class="seclbl">Get started</div>
+    <h2 class="sechd">Create, join, or watch</h2>
+    <p class="secsub">Auctioneers create a room and run the console. Teams open the shared join link and claim a
+      franchise. Anyone can watch the live broadcast screen with the room code.</p>
+
+    <div class="panel startcard">
+      <div class="tabs">
+        <button id="t-create" class="on" onclick="setTab('create')">Create room</button>
+        <button id="t-join" onclick="setTab('join')">Join a team</button>
+        <button id="t-view" onclick="setTab('view')">Watch</button>
       </div>
-      <div class="panelform" id="f-admin">
-        <label>Operator key</label>
+
+      <!-- CREATE -->
+      <div class="pane on" id="p-create">
+        <p class="hint">You'll be the auctioneer. Name is optional — we'll generate a room code and open your console.</p>
         <div class="frow">
-          <input class="grow" id="opKey" type="password" placeholder="Enter operator key" onkeydown="if(event.key==='Enter')goAdmin()">
-          <button class="btn gold" onclick="goAdmin()">Enter →</button>
+          <input class="grow" id="roomName" type="text" maxlength="40" placeholder="Room name (optional)"
+            onkeydown="if(event.key==='Enter')doCreate()">
+          <button class="btn gold" id="createBtn" onclick="doCreate()">Create room →</button>
         </div>
-        <div class="err" id="admErr"></div>
+        <div class="err" id="createErr"></div>
       </div>
 
-      <div class="role pres" id="r-pres" onclick="pick('pres')">
-        <div class="ric">📺</div>
-        <div><h3>Presentation</h3><p>The big broadcast screen. No sign-in needed.</p></div>
-        <span class="arrow">→</span>
-      </div>
-
-      <div class="role team" id="r-team" onclick="pick('team')">
-        <div class="ric">👥</div>
-        <div><h3>Team</h3><p>Bid live &amp; track your squad. Requires your team PIN.</p></div>
-        <span class="arrow">→</span>
-      </div>
-      <div class="panelform" id="f-team">
+      <!-- JOIN -->
+      <div class="pane" id="p-join">
+        <p class="hint">Paste the room code or the full join link your auctioneer sent you.</p>
         <div class="frow">
-          <div class="grow"><label>Your franchise</label><select id="teamSel"></select></div>
-          <div style="width:130px"><label>Team PIN</label>
-            <input id="teamPin" class="pin" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••"
-              onkeydown="if(event.key==='Enter')goTeam()"></div>
+          <input class="grow" id="joinInput" type="text" placeholder="Room code or join link"
+            onkeydown="if(event.key==='Enter')doJoin()">
+          <button class="btn green" id="joinBtn" onclick="doJoin()">Join →</button>
         </div>
-        <button class="btn green" style="width:100%;margin-top:12px" onclick="goTeam()">Join &amp; bid →</button>
-        <div class="err" id="teamErr"></div>
+        <div class="err" id="joinErr"></div>
+      </div>
+
+      <!-- VIEW -->
+      <div class="pane" id="p-view">
+        <p class="hint">Open the big broadcast screen for a room — no sign-in needed.</p>
+        <div class="frow">
+          <input class="grow" id="viewInput" type="text" placeholder="Room code or link"
+            onkeydown="if(event.key==='Enter')doView()">
+          <button class="btn blue" id="viewBtn" onclick="doView()">Watch →</button>
+        </div>
+        <div class="err" id="viewErr"></div>
       </div>
     </div>
+  </div>
+</section>
 
-    <div class="foot">
-      <span id="statline">Loading auction…</span><br>
-      <b>Tip:</b> Presentation on the projector · Admin on the operator's laptop · Team on each table's phone.
+<!-- ===== HOW IT WORKS ===== -->
+<section class="how" id="how">
+  <div class="wrap">
+    <div class="seclbl">How it works</div>
+    <h2 class="sechd">Live in four steps</h2>
+    <p class="secsub">No accounts, no PINs, no install. From an empty room to a full auction floor in minutes.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="n">01</div><div class="si">🎛️</div>
+        <h4>Create a room</h4>
+        <p>You become the auctioneer and get a private console plus a unique room code.</p>
+      </div>
+      <div class="step">
+        <div class="n">02</div><div class="si">🔗</div>
+        <h4>Share the join link</h4>
+        <p>Send one link to every table. They open it on any phone — no download required.</p>
+      </div>
+      <div class="step">
+        <div class="n">03</div><div class="si">👥</div>
+        <h4>Everyone claims a team</h4>
+        <p>Each visitor picks an unclaimed franchise, first-come-first-served — no PINs to share.</p>
+      </div>
+      <div class="step">
+        <div class="n">04</div><div class="si">⚡</div>
+        <h4>Bid live</h4>
+        <p>Register bids in real time. Purses and squads update automatically, down to the last lakh.</p>
+      </div>
     </div>
-  </section>
-</div>
+  </div>
+</section>
+
+<!-- ===== FEATURES ===== -->
+<section class="features" id="features">
+  <div class="wrap">
+    <div class="seclbl">Features</div>
+    <h2 class="sechd">Everything the room needs</h2>
+    <p class="secsub">One platform for the person running the auction, the teams bidding, and the crowd watching.</p>
+    <div class="fgrid">
+      <div class="panel fcard">
+        <div class="fi">⚡</div><h4>Live real-time bidding</h4>
+        <p>Server-authoritative bids stream to every screen over SSE — no refresh, no drift, no disputes.</p>
+      </div>
+      <div class="panel fcard">
+        <div class="fi">🔗</div><h4>One shareable link</h4>
+        <p>Every room has a single join link. Share it once and the whole floor is in.</p>
+      </div>
+      <div class="panel fcard">
+        <div class="fi">👥</div><h4>First-come team claiming</h4>
+        <p>Teams claim franchises on a first-come-first-served basis. No PINs, no manual assignment.</p>
+      </div>
+      <div class="panel fcard">
+        <div class="fi">🎛️</div><h4>Auctioneer console</h4>
+        <p>Present players, register bids, sell, hold, and undo — every action is audited and reversible.</p>
+      </div>
+      <div class="panel fcard">
+        <div class="fi">📺</div><h4>Big-screen broadcast</h4>
+        <p>A cinematic presentation view with halo player cards, live bid, countdown and purses for the room.</p>
+      </div>
+      <div class="panel fcard">
+        <div class="fi">💰</div><h4>Auto purse &amp; squads</h4>
+        <p>Budgets and squad lists track themselves, budget-checked to the last lakh as bids land.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CTA BAND ===== -->
+<section class="band">
+  <div class="wrap">
+    <div class="bandbox">
+      <h3>Ready to drop the hammer?</h3>
+      <p>Create a room now and share the link — your auction floor is one click away.</p>
+      <div class="hcta">
+        <button class="btn gold lg" onclick="openStart('create')">Create a room →</button>
+        <button class="btn ghost lg" onclick="openStart('join')">Join with code</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="wrap">
+    <div class="brand">
+      <div class="logo" style="width:36px;height:36px">IPL</div>
+      <div><div class="brandttl" style="font-size:15px">Auction 2026</div></div>
+    </div>
+    <span class="fspacer"></span>
+    <span>Host on the laptop · Teams on phones · Presentation on the projector.</span>
+  </div>
+</footer>
 
 <script src="bus.js"></script>
 <script>
 const $=id=>document.getElementById(id);
-const LS={set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
-let teams=[];
 
-async function boot(){
-  try{
-    const s=await Bus.getJSON('/api/state');
-    teams=s.teams||[];
-    $('teamSel').innerHTML=teams.length
-      ? teams.map(t=>`<option value="${t.teamId}">${Bus.esc(t.name)}</option>`).join('')
-      : `<option value="">No teams yet — ask the admin</option>`;
-    $('sPlayers').textContent=s.totalPlayers ?? '—';
-    $('sTeams').textContent=teams.length;
-    $('sPhase').textContent=({setup:'Setup',live:'Live',paused:'Paused',complete:'Done'}[s.phase]||s.phase);
-    $('statline').textContent=`${s.totalPlayers} players · ${teams.length} teams · status: ${s.phase}`;
-  }catch(e){ $('statline').textContent='Cannot reach the server — is it running?'; }
+function scrollTop(){ window.scrollTo({top:0,behavior:'smooth'}); }
+
+function setTab(which){
+  ['create','join','view'].forEach(k=>{
+    $('t-'+k).classList.toggle('on',k===which);
+    $('p-'+k).classList.toggle('on',k===which);
+  });
+}
+function openStart(which){
+  setTab(which);
+  const el=$('start');
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+  const focusId={create:'roomName',join:'joinInput',view:'viewInput'}[which];
+  setTimeout(()=>{ const f=$(focusId); if(f) f.focus({preventScroll:true}); },420);
 }
 
-window.pick=(role)=>{
-  ['admin','pres','team'].forEach(r=>$('r-'+r).classList.toggle('on',r===role));
-  $('f-admin').classList.toggle('show',role==='admin');
-  $('f-team').classList.toggle('show',role==='team');
-  if(role==='pres'){ location.href='presentation.html'; return; }
-  if(role==='admin') setTimeout(()=>$('opKey').focus(),60);
-  if(role==='team') setTimeout(()=>$('teamPin').focus(),60);
-};
+// Pull a room code out of either a raw code or a pasted URL containing ?room=CODE
+function normCode(raw){
+  const v=(raw||'').trim();
+  if(!v) return '';
+  const m=v.match(/[?&]room=([^&\s]+)/i);
+  if(m) return decodeURIComponent(m[1]).trim().toUpperCase();
+  return v.toUpperCase();
+}
 
-window.goAdmin=async()=>{
-  const key=$('opKey').value.trim();
-  if(!key){ $('admErr').textContent='Enter the operator key.'; return; }
-  $('admErr').textContent='Checking…';
+window.doCreate=async()=>{
+  const name=$('roomName').value.trim();
+  const btn=$('createBtn'), err=$('createErr');
+  err.textContent='Creating…'; btn.disabled=true;
   try{
-    const r=await fetch('/api/team-codes',{headers:{'x-op-key':key}});
-    if(r.status===401){ $('admErr').textContent='Wrong operator key.'; return; }
-    LS.set('ipl_op_key',key);
-    location.href='operator.html';
-  }catch(e){ $('admErr').textContent='Network error — is the server running?'; }
+    const r=await Bus.createRoom(name);
+    if(r&&r.ok){
+      try{ localStorage.setItem('ipl_host_'+r.code, r.hostKey); }catch(e){}
+      location.href='operator.html?room='+encodeURIComponent(r.code);
+      return;
+    }
+    err.textContent=(r&&r.error)||'Could not create room.';
+  }catch(e){ err.textContent='Network error — is the server running?'; }
+  btn.disabled=false;
 };
 
-window.goTeam=async()=>{
-  if($('teamSel').value===''){ $('teamErr').textContent='No teams configured yet.'; return; }
-  const teamId=Number($('teamSel').value), pin=$('teamPin').value.trim();
-  if(!pin){ $('teamErr').textContent='Enter your team PIN.'; return; }
-  $('teamErr').textContent='Checking…';
-  const r=await Bus.teamLogin(teamId,pin);
-  if(!r.ok){ $('teamErr').textContent=r.error||'Login failed.'; return; }
-  LS.set('ipl_team_id',teamId);
-  LS.set('ipl_team_token_'+teamId,r.token);
-  location.href='team.html';
+window.doJoin=async()=>{
+  const code=normCode($('joinInput').value);
+  const err=$('joinErr'), btn=$('joinBtn');
+  if(!code){ err.textContent='Enter a room code or join link.'; return; }
+  err.textContent='Checking…'; btn.disabled=true;
+  const info=await Bus.roomInfo(code);
+  btn.disabled=false;
+  if(info&&info.ok){ location.href='join.html?room='+encodeURIComponent(code); return; }
+  err.textContent='Room not found.';
 };
 
-boot();
+window.doView=async()=>{
+  const code=normCode($('viewInput').value);
+  const err=$('viewErr'), btn=$('viewBtn');
+  if(!code){ err.textContent='Enter a room code or link.'; return; }
+  err.textContent='Checking…'; btn.disabled=true;
+  const info=await Bus.roomInfo(code);
+  btn.disabled=false;
+  if(info&&info.ok){ location.href='presentation.html?room='+encodeURIComponent(code); return; }
+  err.textContent='Room not found.';
+};
 </script>
 </body>
 </html>

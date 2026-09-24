@@ -22,10 +22,11 @@
   <div class="row between center noprint">
     <div class="brand"><div class="logo">IPL</div><div><small>Final Report</small><div style="font-weight:800">Auction 2026</div></div></div>
     <div class="row" style="gap:8px">
-      <button class="btn sm" onclick="location.reload()">Refresh</button>
+      <button class="btn sm" onclick="load()">Refresh</button>
+      <button class="btn sm" onclick="copyLink(this)">🔗 Copy results link</button>
       <button class="btn sm blue" onclick="window.print()">Print / PDF</button>
       <button class="btn sm gold" onclick="downloadJSON()">Download JSON</button>
-      <button class="btn sm" onclick="downloadCSV()">Download CSV</button>
+      <button class="btn sm" onclick="downloadCSV()">Download all squads (CSV)</button>
     </div>
   </div>
 
@@ -48,9 +49,17 @@
 <script>
 const $=id=>document.getElementById(id);
 let R=null;
+
+// require a room in the URL
+if(!Bus.ROOM){ location.replace('index.html'); }
+
 async function load(){
-  R=await Bus.getJSON('/api/report');
-  $('sub').textContent=`${R.season} · generated ${new Date(R.generatedAt).toLocaleString()} · status ${R.phase}`;
+  $('sub').textContent='Loading report…';
+  try{
+    R=await Bus.getJSON(Bus.base()+'/report');
+  }catch(e){ $('sub').textContent='Could not load the report — is the room still open?'; return; }
+  if(!R||!R.teams){ $('sub').textContent='No report available for this room yet.'; return; }
+  $('sub').textContent=`Room ${Bus.ROOM} · ${R.season} · generated ${new Date(R.generatedAt).toLocaleString()} · status ${R.phase}`;
   $('kpis').innerHTML=[
     ['Players sold',R.counts.sold],['Unsold',R.counts.unsold],
     ['Total spend',Bus.fmtL(R.totalSpendL)],['Teams',R.teams.length],
@@ -65,7 +74,10 @@ async function load(){
   $('teams').innerHTML=R.teams.map(t=>`<div class="tpanel">
     <div class="thead" style="background:${Bus.esc(t.color||'#888')}">
       <div><b>${Bus.esc(t.name)}</b><div style="font-size:12px">${t.count} players · ${t.overseas} overseas</div></div>
-      <div style="text-align:right"><div class="r mono">${Bus.fmtL(t.spent)} spent</div><div style="font-size:12px">${Bus.fmtL(t.remaining)} left</div></div>
+      <div style="text-align:right">
+        <div class="r mono">${Bus.fmtL(t.spent)} spent</div><div style="font-size:12px">${Bus.fmtL(t.remaining)} left</div>
+        <button class="btn sm ghost noprint" style="margin-top:6px" onclick="downloadTeamCSV(${t.id})">⬇ Squad CSV</button>
+      </div>
     </div>
     <table><tbody>${t.squad.length?t.squad.map(p=>`<tr><td>${Bus.esc(p.name)}${p.overseas?' <span class="tag" style="background:#20305f;color:#7aa9ff">OS</span>':''}</td>
       <td class="mut">${Bus.esc(p.role||'')}</td><td style="text-align:right" class="mono">${Bus.fmtL(p.priceL)}</td></tr>`).join('')
@@ -77,15 +89,27 @@ async function load(){
     <td class="mut">${Bus.esc(p.country||'')}</td><td style="text-align:right" class="mono">base ${Bus.fmtL(p.base)}</td></tr>`).join('')
     :'<tr><td class="dim">None</td></tr>')+'</tbody>';
 }
-window.downloadJSON=()=>{ const b=new Blob([JSON.stringify(R,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='ipl-auction-2026-report.json';a.click(); };
-window.downloadCSV=()=>{
+// Guard against CSV formula injection: a cell starting with = + - @ (or tab/CR)
+// gets a leading apostrophe so spreadsheets treat it as text, not a formula.
+function csvCell(v){ let s=String(v==null?'':v); if(/^[=+\-@\t\r]/.test(s)) s="'"+s; return '"'+s.replace(/"/g,'""')+'"'; }
+function saveBlob(data,type,name){ const b=new Blob([data],{type});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+const slug=s=>String(s||'team').replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').toLowerCase()||'team';
+
+window.downloadJSON=()=>{ if(!R)return; saveBlob(JSON.stringify(R,null,2),'application/json',`ipl-auction-${Bus.ROOM}-report.json`); };
+window.downloadCSV=()=>{ if(!R)return;
   let rows=[['Team','Player','Role','Country','Overseas','Price(L)']];
   R.teams.forEach(t=>t.squad.forEach(p=>rows.push([t.name,p.name,p.role||'',p.country||'',p.overseas?'Y':'N',p.priceL])));
-  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const b=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='ipl-auction-2026-squads.csv';a.click();
+  saveBlob(rows.map(r=>r.map(csvCell).join(',')).join('\n'),'text/csv',`ipl-auction-${Bus.ROOM}-squads.csv`);
 };
-load();
+window.downloadTeamCSV=(teamId)=>{ if(!R)return; const t=R.teams.find(x=>x.id===teamId); if(!t)return;
+  let rows=[['Player','Role','Country','Overseas','Price(L)']];
+  t.squad.forEach(p=>rows.push([p.name,p.role||'',p.country||'',p.overseas?'Y':'N',p.priceL]));
+  saveBlob(rows.map(r=>r.map(csvCell).join(',')).join('\n'),'text/csv',`squad-${slug(t.name)}.csv`);
+};
+window.copyLink=async(btn)=>{ const url=`${location.origin}/report.html?room=${Bus.ROOM}`;
+  try{ await navigator.clipboard.writeText(url); }catch(e){ prompt('Results link:',url); return; }
+  const o=btn.textContent; btn.textContent='✓ Copied'; setTimeout(()=>btn.textContent=o,1400); };
+if(Bus.ROOM) load();
 </script>
 </body>
 </html>

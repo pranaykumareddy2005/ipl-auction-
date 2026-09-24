@@ -3,16 +3,44 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Operator Console — IPL Auction 2026</title>
+<title>Auctioneer Console — IPL Auction 2026</title>
 <link rel="stylesheet" href="app.css">
 <style>
   .bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
-    gap:12px;padding:12px 18px;background:rgba(10,14,26,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);position:sticky}
+    gap:12px;padding:12px 18px;background:rgba(10,14,26,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
   .bar::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
     background:linear-gradient(90deg,transparent,rgba(245,197,66,.5),rgba(90,210,255,.4),transparent)}
+  .bar .actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}
+  .roomchip{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;
+    background:linear-gradient(135deg,rgba(245,197,66,.14),rgba(224,164,0,.08));border:1px solid rgba(245,197,66,.4)}
+  .roomchip .lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);font-weight:800}
+  .roomchip .val{font-family:var(--f-head);font-weight:700;font-size:15px;letter-spacing:3px;color:var(--ink)}
   .main{max-width:1400px;margin:0 auto;padding:16px}
   .grid{display:grid;grid-template-columns:1.15fr .85fr;gap:16px;align-items:start}
   @media(max-width:1050px){.grid{grid-template-columns:1fr}}
+
+  /* ---- Share panel ---- */
+  .sharepanel{background:
+      radial-gradient(600px 200px at 12% -40%,rgba(245,197,66,.12),transparent 60%),
+      linear-gradient(180deg,var(--panel),var(--bg2));
+    border:1px solid var(--line2);border-radius:var(--r-lg);padding:18px 20px;margin-bottom:16px;
+    box-shadow:var(--shadow);display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:center}
+  @media(max-width:760px){.sharepanel{grid-template-columns:1fr}}
+  .sharecode{display:flex;flex-direction:column;gap:4px;padding-right:22px;border-right:1px solid var(--line)}
+  @media(max-width:760px){.sharecode{border-right:none;border-bottom:1px solid var(--line);padding:0 0 14px}}
+  .sharecode .cap{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);font-weight:800}
+  .sharecode .big{font-family:var(--f-display);font-size:46px;line-height:.95;letter-spacing:5px;
+    background:linear-gradient(120deg,#fff 25%,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sharecode .sub{font-size:12px;color:var(--mut)}
+  .sharelinks{display:flex;flex-direction:column;gap:12px;min-width:0}
+  .linkgroup{min-width:0}
+  .linkgroup .lg-top{display:flex;align-items:baseline;gap:8px;margin-bottom:5px}
+  .linkgroup .lg-name{font-family:var(--f-head);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink);font-weight:600}
+  .linkgroup .lg-hint{font-size:11px;color:var(--dim)}
+  .linkrow{display:flex;gap:8px;align-items:center;min-width:0}
+  .linkrow input{font-family:var(--f-body);font-size:13px;background:#0a1224;color:var(--mut);flex:1;min-width:0}
+  .linkrow .btn{flex:none;white-space:nowrap}
+
   .teamgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
   .tbid{position:relative;text-align:left;padding:12px 12px 12px 15px;border-radius:12px;
     border:1px solid var(--line2);border-left:5px solid var(--tc,var(--line2));
@@ -31,16 +59,21 @@
     filter:drop-shadow(0 0 14px rgba(245,197,66,.3))}
   .teamhead{margin-bottom:4px}
   .teamhead span{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);font-weight:700}
-  .pinbox{text-align:center;font-family:var(--f-head);font-weight:600;letter-spacing:3px}
   #timerNum{font-family:var(--f-display)!important}
+  #timerNum.timeup{color:#e63946;animation:tflash .7s infinite}
+  @keyframes tflash{50%{opacity:.35}}
+  #timerMsg{margin-top:4px;font-size:12px;font-weight:800;color:#ffb3b0;letter-spacing:.5px}
+  .btn.pulse{animation:btnpulse 1s infinite}
+  @keyframes btnpulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.45)}70%{box-shadow:0 0 0 14px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
   .acts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
   .qitem{display:flex;align-items:center;gap:8px;padding:7px 9px;border-bottom:1px solid var(--line);font-size:13px}
-  .qitem .nm{flex:1}
+  .qitem:last-child{border-bottom:none}
+  .qitem .nm{flex:1;min-width:0}
   .list{max-height:280px;overflow:auto}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
   .seg button{background:transparent;border:none;color:var(--mut);padding:7px 12px;font-weight:700;font-size:12px}
   .seg button.on{background:var(--panel2);color:var(--ink)}
-  .teamrow{display:grid;grid-template-columns:1.5fr .55fr 40px 1fr .7fr auto auto;gap:6px;align-items:center;margin-bottom:6px}
+  .teamrow{display:grid;grid-template-columns:1.5fr .55fr 44px 1fr auto;gap:8px;align-items:center;margin-bottom:6px}
   .modal{position:fixed;inset:0;background:rgba(4,7,16,.75);display:grid;place-items:center;z-index:60}
   .modal .box{width:360px;max-width:92vw}
   .tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
@@ -53,19 +86,46 @@
 </head>
 <body>
 <div class="bar">
-  <div class="brand"><div class="logo">IPL</div><div><small>Operator</small><div style="font-weight:800" id="roundlbl">Auction 2026</div></div></div>
-  <div class="row center" style="gap:10px">
+  <div class="brand"><div class="logo">IPL</div><div><small>Auctioneer</small><div class="brandttl" id="roundlbl">Auction 2026</div></div></div>
+  <div class="actions">
+    <span class="roomchip"><span class="lbl">Room</span><span class="val" id="barRoomCode">—</span></span>
     <span id="progress" class="mut" style="font-weight:700;font-size:13px"></span>
     <span id="phase" class="pill setup"><span class="dot"></span><span id="phaseText">Setup</span></span>
     <button class="btn sm" id="pauseBtn" onclick="togglePause()">Pause</button>
     <button class="btn sm red ghost" onclick="cmd('complete')">Complete</button>
     <button class="btn sm red ghost" onclick="showRestart()">↻ Restart</button>
-    <a class="btn sm ghost" href="pins.html" target="_blank">🔑 PINs</a>
-    <a class="btn sm ghost" href="report.html" target="_blank">Report</a>
+    <a class="btn sm ghost" id="viewAuctionBtn" href="#" target="_blank">📺 View Auction</a>
+    <a class="btn sm ghost" id="reportBtn" href="#" target="_blank">Report</a>
   </div>
 </div>
 
 <div class="main">
+  <!-- ===================== SHARE ===================== -->
+  <div class="sharepanel">
+    <div class="sharecode">
+      <span class="cap">Room code</span>
+      <span class="big" id="shareRoomCode">—</span>
+      <span class="sub">Share this code or a link below to bring people in.</span>
+    </div>
+    <div class="sharelinks">
+      <div class="linkgroup">
+        <div class="lg-top"><span class="lg-name">Team join link</span><span class="lg-hint">Send to team reps — they claim a team and bid live</span></div>
+        <div class="linkrow">
+          <input id="joinLink" readonly onclick="this.select()">
+          <button class="btn sm gold" onclick="copyField('joinLink',this)">Copy</button>
+        </div>
+      </div>
+      <div class="linkgroup">
+        <div class="lg-top"><span class="lg-name">Presentation link</span><span class="lg-hint">Big-screen spectator view of the live auction</span></div>
+        <div class="linkrow">
+          <input id="presLink" readonly onclick="this.select()">
+          <button class="btn sm blue" onclick="copyField('presLink',this)">Copy</button>
+          <a class="btn sm ghost" id="presOpenBtn" href="#" target="_blank">Open ↗</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===================== SETUP ===================== -->
   <div id="setup">
     <div class="tabs">
@@ -81,7 +141,7 @@
           <button class="btn sm" onclick="addTeam()">+ Add team</button>
           <button class="btn sm ghost" onclick="resetTeams()">Reset to 10 IPL teams</button>
         </div>
-        <p class="dim" style="font-size:12px;margin:10px 0 0">Each team gets a <b>bid PIN</b>. Share it with that team's rep — they open the <b>Team</b> page on their phone, pick the team, enter the PIN, and can bid live from the web. Cards raised in the room are still entered here. PINs are also listed under the live <b>Teams</b> tab.</p>
+        <p class="dim" style="font-size:12px;margin:10px 0 0">Team reps join from the <b>Team join link</b> above — they open it on their phone, claim their team, and can bid live from the web. Cards raised in the room are still entered here. You can see who has joined, and free up a team, under the live <b>Teams</b> tab.</p>
       </div>
       <div class="panel">
         <div class="card-title">Auction settings</div>
@@ -139,6 +199,7 @@
             <div style="text-align:right">
               <div class="mut" style="font-size:12px;letter-spacing:1px">TIMER</div>
               <div id="timerNum" style="font-size:36px;font-weight:900" class="mono">—</div>
+              <div id="timerMsg" style="display:none">⏰ Time up</div>
               <button class="btn sm" onclick="cmd('startTimer')">Reset timer</button>
             </div>
           </div>
@@ -154,8 +215,8 @@
             </div>
           </div>
           <div class="acts">
-            <button class="btn green" onclick="doSold()">✔ SOLD</button>
-            <button class="btn red" onclick="cmd('unsold')">✖ UNSOLD</button>
+            <button class="btn green" id="soldBtn" onclick="doSold()">✔ SOLD</button>
+            <button class="btn red" id="unsoldBtn" onclick="cmd('unsold')">✖ UNSOLD</button>
             <button class="btn" onclick="cmd('hold')">✋ HOLD</button>
             <button class="btn" onclick="cmd('skip')">↷ SKIP</button>
             <button class="btn ghost" onclick="cmd('undo')">⟲ Undo last</button>
@@ -190,7 +251,10 @@
             <div class="card-title">Held</div><div class="list" id="heldList"></div>
             <div class="card-title" style="margin-top:10px">Skipped</div><div class="list" id="skipList"></div>
           </div>
-          <div id="lt-teams" class="hide"><div class="list" id="teamsList"></div></div>
+          <div id="lt-teams" class="hide">
+            <p class="dim" style="font-size:12px;margin:0 0 8px">Team reps join with the link above. Release a team to sign out its current device and reopen the slot.</p>
+            <div class="list" id="teamsList"></div>
+          </div>
           <div id="lt-fix" class="hide">
             <details open><summary>Reopen a sold player</summary>
               <input id="reopenSearch" placeholder="Search sold players…" oninput="renderReopen()" style="margin:8px 0">
@@ -216,18 +280,18 @@
 
 <!-- key modal -->
 <div class="modal hide" id="keyModal"><div class="panel box">
-  <div class="card-title">Operator key</div>
-  <p class="mut" style="font-size:13px;margin-top:0">Enter the operator key to control the auction. (Default: <code>ipl2026</code>)</p>
-  <input id="keyInput" type="password" placeholder="Operator key" onkeydown="if(event.key==='Enter')saveKey()">
+  <div class="card-title">Auctioneer key</div>
+  <p class="mut" style="font-size:13px;margin-top:0">Enter the auctioneer key for this room to take control. You received it when you created the room.</p>
+  <input id="keyInput" type="password" placeholder="Auctioneer key" onkeydown="if(event.key==='Enter')saveKey()">
   <button class="btn blue" style="margin-top:10px;width:100%" onclick="saveKey()">Unlock</button>
 </div></div>
 
 <!-- restart confirm modal -->
 <div class="modal hide" id="restartModal"><div class="panel box">
   <div class="card-title" style="color:#ffb3c2">⚠ Restart auction</div>
-  <p class="mut" style="font-size:13px;margin-top:0">This wipes every <b>sold / unsold result</b> and all bids, re-pools all players, and returns to <b>Setup</b>. Teams, settings and PINs are kept. This cannot be undone.</p>
-  <label>Re-enter operator key to confirm</label>
-  <input id="restartKey" type="password" placeholder="Operator key" onkeydown="if(event.key==='Enter')doRestart()">
+  <p class="mut" style="font-size:13px;margin-top:0">This wipes every <b>sold / unsold result</b> and all bids, re-pools all players, and returns to <b>Setup</b>. Teams and settings are kept. This cannot be undone.</p>
+  <label>Re-enter auctioneer key to confirm</label>
+  <input id="restartKey" type="password" placeholder="Auctioneer key" onkeydown="if(event.key==='Enter')doRestart()">
   <div class="row" style="margin-top:12px;gap:8px">
     <button class="btn red grow" onclick="doRestart()">Restart auction</button>
     <button class="btn ghost" onclick="closeModal('restartModal')">Cancel</button>

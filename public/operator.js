@@ -1,11 +1,18 @@
 'use strict';
-// Operator console logic. All writes go through cmd() -> POST /api/command with the
-// operator key. State comes only from the SSE snapshot; this UI never trusts itself.
+// Operator console logic (MULTI-ROOM). All writes go through cmd() -> Bus.command
+// scoped to this room with the auctioneer host key. State comes only from the SSE
+// snapshot; this UI never trusts itself.
 const $ = (id) => document.getElementById(id);
 const fmtL = Bus.fmtL, esc = Bus.esc;
 
 const LS={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
-let opKey = LS.get('ipl_op_key') || '';
+
+// Room gating: this console only works inside a room.
+if (!Bus.ROOM) { location.replace('index.html'); }
+const HOST_LS_KEY = 'ipl_host_' + Bus.ROOM;
+function getKey(){ return LS.get(HOST_LS_KEY) || ''; }
+function setKey(k){ LS.set(HOST_LS_KEY, k || ''); }
+
 let snap = null;
 let catalog = [];          // all players {sr,name,role,country,cu,base}
 let bySr = {};
@@ -20,46 +27,66 @@ const DEFAULT_TEAMS = [
   ['Sunrisers Hyderabad','SRH','#f26522'],['Gujarat Titans','GT','#1eb2c4'],
   ['Punjab Kings','PBKS','#d71920'],['Lucknow Super Giants','LSG','#00a19a'],
 ];
-function genPin(){ return String(Math.floor(1000+Math.random()*9000)); }
-let teamDraft = DEFAULT_TEAMS.map((t,i)=>({id:i,name:t[0],short:t[1],color:t[2],owner:'',purseL:12000,code:genPin()}));
-let teamCodes = {};   // teamId -> PIN, for the live Teams tab (operator-only view)
+let teamDraft = DEFAULT_TEAMS.map((t,i)=>({id:i,name:t[0],short:t[1],color:t[2],owner:'',purseL:12000}));
 
 // ---------- command wrapper ----------
 async function cmd(name, payload) {
-  const r = await Bus.command(name, payload, opKey);
-  if (!r.ok) { Bus.toast(r.error || 'Rejected', 'err'); if (/operator key/i.test(r.error||'')) showKey(); }
+  const r = await Bus.command(name, payload, getKey());
+  if (!r.ok) { Bus.toast(r.error || 'Rejected', 'err'); if (/auctioneer key/i.test(r.error||'')) showKey(); }
+  else if (r.warning) { Bus.toast('⚠ ' + r.warning, 'err'); }
   return r;
-}
-// Operator-authenticated fetch for the team-PIN endpoints.
-async function opFetch(url, body) {
-  try {
-    const r = await fetch(url, { method: body?'POST':'GET',
-      headers: Object.assign({ 'x-op-key': opKey||'' }, body?{'Content-Type':'application/json'}:{}),
-      body: body?JSON.stringify(body):undefined });
-    return await r.json();
-  } catch (e) { return { ok:false, error:'Network error' }; }
 }
 
 // ---------- boot ----------
 async function boot() {
-  if (!opKey) showKey();
-  const d = await Bus.getJSON('/api/players');
+  if (!Bus.ROOM) return;
+  initShare();
+  if (!getKey()) showKey();
+  const d = await Bus.getJSON('/api/players');   // global player catalog (not room-scoped)
   catalog = d.players; cats = d.cats; window.__stars = d.stars || {};
   bySr = {}; catalog.forEach(p => bySr[p.sr] = p);
   buildCatSeg();
-  // Prefill PIN fields with any PINs already saved on the server.
-  if (opKey) { const c = await opFetch('/api/team-codes'); if (c && c.ok && c.codes) { teamCodes = c.codes; teamDraft.forEach(t=>{ if(c.codes[t.id]) t.code=c.codes[t.id]; }); } }
   renderTeamEditor();
-  const pool = await Bus.getJSON('/api/pool');
+  const pool = await Bus.getJSON(Bus.base() + '/pool');
   poolOrder = pool.order.slice();
   renderCatalog(); renderQueueEditor();
   Bus.connect(onState, on => Bus.connBadge(on));
 }
 
+// ---------- SHARE panel ----------
+function initShare() {
+  const origin = location.origin;
+  const join = `${origin}/join.html?room=${Bus.ROOM}`;
+  const pres = `${origin}/presentation.html?room=${Bus.ROOM}`;
+  const rep  = `${origin}/report.html?room=${Bus.ROOM}`;
+  const set = (id,v)=>{ const el=$(id); if(el){ if(el.tagName==='INPUT') el.value=v; else el.textContent=v; } };
+  const href = (id,v)=>{ const el=$(id); if(el) el.href=v; };
+  set('shareRoomCode', Bus.ROOM);
+  set('barRoomCode', Bus.ROOM);
+  set('joinLink', join);
+  set('presLink', pres);
+  href('viewAuctionBtn', pres);
+  href('presOpenBtn', pres);
+  href('reportBtn', rep);
+}
+window.copyField=async(inputId, btn)=>{
+  const el=$(inputId); if(!el) return;
+  const label=btn.textContent;
+  try{ await navigator.clipboard.writeText(el.value); }
+  catch(e){ el.select(); prompt('Copy this link:', el.value); return; }
+  btn.textContent='✓ Copied';
+  setTimeout(()=>{ btn.textContent=label; },1400);
+};
+
+let _lastRev = -1, _lastPhase = '';
 function onState(s) {
   snap = s;
-  // keep local poolOrder in sync with server when not mid-edit in setup
-  if (s.phase !== 'setup') { /* live: server pool is authoritative for preview */ }
+  timerSync(s); // keep the countdown in sync cheaply, every snapshot
+  // Skip the heavy DOM rebuild when nothing actually changed (e.g. per-second
+  // timer ticks): rev only advances on real events. The 200ms timer loop still
+  // updates the countdown locally.
+  if (s.rev === _lastRev && s.phase === _lastPhase) return;
+  _lastRev = s.rev; _lastPhase = s.phase;
   $('phase').className = 'pill ' + s.phase;
   $('phaseText').textContent = {setup:'Setup',live:'Live',paused:'Paused',complete:'Complete'}[s.phase] || s.phase;
   $('progress').textContent = `Sold ${s.counts.sold} · Unsold ${s.counts.unsold} · Left ${s.counts.pool}`;
@@ -70,30 +97,27 @@ function onState(s) {
   const inSetup = s.phase === 'setup';
   $('setup').classList.toggle('hide', !inSetup);
   $('live').classList.toggle('hide', inSetup);
-  if (inSetup) { $('poolCount').textContent = `(${poolOrder.length} players)`; }
+  if (inSetup) { $('poolCount').textContent = `(${poolOrder.length} players)`; syncSettingsForm(s); }
   else renderLive(s);
 }
 
 // ================= SETUP: teams =================
 function renderTeamEditor() {
   $('teamEditor').innerHTML = `<div class="teamrow teamhead">
-      <span>Team name</span><span>Abbr</span><span>Colour</span><span>Owner</span><span>Bid PIN</span><span></span><span></span></div>` +
+      <span>Team name</span><span>Abbr</span><span>Colour</span><span>Owner</span><span></span></div>` +
     teamDraft.map((t,i)=>`
     <div class="teamrow">
       <input value="${esc(t.name)}" oninput="editTeam(${i},'name',this.value)" placeholder="Team name">
       <input value="${esc(t.short)}" oninput="editTeam(${i},'short',this.value)" placeholder="ABR">
       <input type="color" value="${t.color}" oninput="editTeam(${i},'color',this.value)" style="width:38px;padding:2px;height:38px">
       <input value="${esc(t.owner)}" oninput="editTeam(${i},'owner',this.value)" placeholder="Owner (optional)">
-      <input class="pinbox" value="${esc(t.code||'')}" oninput="editTeam(${i},'code',this.value)" placeholder="PIN" maxlength="8">
-      <button class="btn sm ghost" title="Regenerate PIN" onclick="regenPin(${i})">🎲</button>
       <button class="btn sm red ghost" onclick="delTeam(${i})">✕</button>
     </div>`).join('');
 }
 window.editTeam=(i,k,v)=>{ teamDraft[i][k]=v; };
-window.regenPin=(i)=>{ teamDraft[i].code=genPin(); renderTeamEditor(); };
 window.delTeam=(i)=>{ teamDraft.splice(i,1); teamDraft.forEach((t,j)=>t.id=j); renderTeamEditor(); };
-window.addTeam=()=>{ teamDraft.push({id:teamDraft.length,name:'Team '+(teamDraft.length+1),short:'T'+(teamDraft.length+1),color:'#888',owner:'',purseL:12000,code:genPin()}); renderTeamEditor(); };
-window.resetTeams=()=>{ teamDraft=DEFAULT_TEAMS.map((t,i)=>({id:i,name:t[0],short:t[1],color:t[2],owner:'',purseL:12000,code:genPin()})); renderTeamEditor(); };
+window.addTeam=()=>{ teamDraft.push({id:teamDraft.length,name:'Team '+(teamDraft.length+1),short:'T'+(teamDraft.length+1),color:'#888',owner:'',purseL:12000}); renderTeamEditor(); };
+window.resetTeams=()=>{ teamDraft=DEFAULT_TEAMS.map((t,i)=>({id:i,name:t[0],short:t[1],color:t[2],owner:'',purseL:12000})); renderTeamEditor(); };
 
 async function saveSettings() {
   const purseCr = Number($('setPurse').value)||120;
@@ -104,13 +128,19 @@ async function saveSettings() {
   const teams = teamDraft.map((t,i)=>({ id:i, name:t.name, short:t.short, color:t.color, owner:t.owner, purseL:settings.purseL }));
   r = await cmd('setTeams', { teams });
   if (!r.ok) return;
-  // PINs are stored server-side, out of the event log. Send them separately.
-  const codes = {}; teamDraft.forEach((t,i)=>{ if(t.code && String(t.code).trim()) codes[i]=String(t.code).trim(); });
-  const cr = await opFetch('/api/team-codes', { codes });
-  if (cr && cr.ok) teamCodes = cr.codes || {};
-  Bus.toast('Settings, teams & bid PINs saved', 'ok');
+  Bus.toast('Settings & teams saved', 'ok');
 }
 window.saveSettings=saveSettings;
+
+// Reflect existing settings back into the setup form (purse shown in Cr).
+function syncSettingsForm(s){
+  if (!s || !s.settings) return;
+  if (document.activeElement && document.activeElement.tagName==='INPUT') return;
+  $('setPurse').value = Math.round((s.settings.purseL||0)/100);
+  $('setSquad').value = s.settings.squadMax;
+  $('setOverseas').value = s.settings.overseasMax;
+  $('setTimer').value = s.settings.timerSec;
+}
 
 // ================= SETUP: pool =================
 function buildCatSeg() {
@@ -273,13 +303,26 @@ function renderHeld(s){
     <button class="btn sm blue" onclick="cmd('setNext',{sr:${p.sr}})">Requeue next</button></div>`).join('')||'<div class="dim" style="padding:8px">None</div>';
 }
 function renderTeamsList(s){
-  $('teamsList').innerHTML=s.teams.map(t=>`<div class="qitem">
+  $('teamsList').innerHTML=s.teams.map(t=>{
+    const status = t.claimed
+      ? `<span class="tag" style="background:#123a24;color:#7ee0a1;font-weight:700">Claimed ✓</span>
+         <button class="btn sm red ghost" onclick="doRelease(${t.teamId})">Release</button>`
+      : `<span class="tag" style="background:#20263a;color:var(--mut)">Open</span>`;
+    return `<div class="qitem">
     <span class="sw" style="width:12px;height:12px;border-radius:3px;background:${esc(t.color||'#888')}"></span>
     <span class="nm">${esc(t.name)} <span class="dim">· ${t.count}p · ${t.overseas}os</span></span>
-    ${teamCodes[t.teamId]?`<span class="tag" title="Web-bidding PIN" style="background:#20305f;color:#cde;letter-spacing:2px">PIN ${esc(teamCodes[t.teamId])}</span>`:''}
-    <span class="mono">${fmtL(t.remaining)}</span></div>`).join('');
+    ${status}
+    <span class="mono">${fmtL(t.remaining)}</span></div>`;
+  }).join('');
 }
-async function loadTeamCodes(){ const c=await opFetch('/api/team-codes'); if(c&&c.ok) teamCodes=c.codes||{}; if(snap) renderTeamsList(snap); }
+window.doRelease=async(teamId)=>{
+  const t=(snap&&snap.teams||[]).find(x=>x.teamId===teamId);
+  const nm=t?t.name:('Team '+teamId);
+  if(!confirm(`Release ${nm}? Their device will be signed out.`)) return;
+  const r=await Bus.releaseTeam(teamId, getKey());
+  if(r&&r.ok){ Bus.toast(`${nm} released`,'ok'); }
+  else { Bus.toast((r&&r.error)||'Could not release','err'); if(r&&/auctioneer key/i.test(r.error||'')) showKey(); }
+};
 function renderAdjTeams(s){
   const cur=$('adjTeam').value;
   $('adjTeam').innerHTML=s.teams.map(t=>`<option value="${t.teamId}">${esc(t.name)}</option>`).join('');
@@ -301,7 +344,7 @@ window.doReopen=async(sr)=>{ if(!confirm('Reopen this player? The team will be r
   const r=await cmd('reopen',{sr}); if(r.ok)Bus.toast('Player reopened & refunded','ok'); };
 
 async function renderLog(){
-  const d=await Bus.getJSON('/api/history?limit=60');
+  const d=await Bus.getJSON(Bus.base()+'/history?limit=60');
   const evs=d.events.slice().reverse();
   $('logList').innerHTML=evs.map(e=>{
     const t=new Date(e.ts).toLocaleTimeString();
@@ -339,14 +382,13 @@ function describe(e){
 window.togglePause=()=>{ if(!snap)return; cmd(snap.phase==='paused'?'resume':'pause'); };
 window.liveTab=(t,e)=>{ ['queue','held','teams','fix','log'].forEach(k=>$('lt-'+k).classList.toggle('hide',k!==t));
   [...document.querySelectorAll('#live .tabs button')].forEach(b=>b.classList.remove('on')); e.target.classList.add('on');
-  if(t==='log')renderLog(); if(t==='fix')renderReopen(); if(t==='teams')loadTeamCodes(); };
+  if(t==='log')renderLog(); if(t==='fix')renderReopen(); if(t==='teams'&&snap)renderTeamsList(snap); };
 
 // present modal
 window.openPresent=()=>{ $('presentModal').classList.remove('hide'); renderPresent(); $('presentSearch').focus(); };
 window.closeModal=(id)=>$(id).classList.add('hide');
 window.renderPresent=()=>{
   const q=($('presentSearch').value||'').toLowerCase().trim();
-  const avail=(snap.queuePreview||[]); // top of queue; plus search whole catalog for setNext+present
   const src = q ? catalog.filter(p=>p.name.toLowerCase().includes(q)).slice(0,40) : (snap.queuePreview||[]);
   $('presentList').innerHTML=src.map(p=>`<div class="qitem"><span class="nm">${esc(p.name)} <span class="dim">· ${fmtL(p.base)}</span></span>
     <button class="btn sm gold" onclick="presentPick(${p.sr})">Put on block</button></div>`).join('')||'<div class="dim" style="padding:8px">No match.</div>';
@@ -356,9 +398,23 @@ window.presentPick=async(sr)=>{ await cmd('setNext',{sr}); const r=await cmd('pr
 // timer
 let endsAt=null,dur=0;
 function timerSync(s){ const t=s.timer; if(t&&t.running&&t.remainingMs>0){endsAt=Date.now()+t.remainingMs;dur=t.durationMs;} else if(!(t&&t.running)){endsAt=null;} }
+let wasTimeUp=false, _actx;
+function beep(){ try{ _actx=_actx||new (window.AudioContext||window.webkitAudioContext)(); const o=_actx.createOscillator(),g=_actx.createGain(); o.frequency.value=880; o.connect(g); g.connect(_actx.destination); g.gain.setValueAtTime(0.0001,_actx.currentTime); g.gain.exponentialRampToValueAtTime(0.25,_actx.currentTime+0.01); g.gain.exponentialRampToValueAtTime(0.0001,_actx.currentTime+0.35); o.start(); o.stop(_actx.currentTime+0.36);}catch(e){} }
+function clearTimeUp(){ const s=$('soldBtn'),u=$('unsoldBtn'),m=$('timerMsg'),el=$('timerNum'); if(el)el.classList.remove('timeup'); if(m)m.style.display='none'; if(s)s.classList.remove('pulse'); if(u)u.classList.remove('pulse'); wasTimeUp=false; }
 setInterval(()=>{ const el=$('timerNum'); if(!el)return;
-  if(endsAt){ const sec=Math.ceil(Math.max(0,endsAt-Date.now())/1000); el.textContent=sec; el.style.color=sec<=5?'#e63946':''; }
-  else { el.textContent='—'; el.style.color=''; } },200);
+  const onBlock=!!(snap&&snap.current);
+  if(endsAt){
+    const ms=Math.max(0,endsAt-Date.now()), sec=Math.ceil(ms/1000);
+    el.textContent=sec; el.style.color=sec<=5?'#e63946':'';
+    if(ms<=0 && onBlock){
+      const hasBid=!!(snap&&snap.bidding&&snap.bidding.leadingTeamId!=null);
+      el.textContent='0'; el.classList.add('timeup');
+      const m=$('timerMsg'); if(m){ m.textContent=hasBid?'⏰ Time up — hit SOLD':'⏰ Time up — no bids'; m.style.display=''; }
+      const s=$('soldBtn'),u=$('unsoldBtn'); if(s)s.classList.toggle('pulse',hasBid); if(u)u.classList.toggle('pulse',!hasBid);
+      if(!wasTimeUp){ beep(); wasTimeUp=true; }
+    } else { clearTimeUp(); }
+  }
+  else { el.textContent='—'; el.style.color=''; clearTimeUp(); } },200);
 
 // keyboard shortcuts for fast operation
 document.addEventListener('keydown',(e)=>{
@@ -370,20 +426,20 @@ document.addEventListener('keydown',(e)=>{
   else if(e.key==='0'){ const t=snap.teams[9]; if(t)bid(t.teamId); }
 });
 
-// restart (requires re-entering the operator key)
+// restart (requires re-entering the auctioneer key)
 window.showRestart=()=>{ $('restartErr').textContent=''; $('restartKey').value=''; $('restartModal').classList.remove('hide'); setTimeout(()=>$('restartKey').focus(),50); };
 window.doRestart=async()=>{
   const key=$('restartKey').value.trim();
-  if(!key){ $('restartErr').textContent='Enter the operator key.'; return; }
+  if(!key){ $('restartErr').textContent='Enter the auctioneer key.'; return; }
   $('restartErr').textContent='Restarting…';
   const r=await Bus.command('reset',{},key);   // verified server-side with the entered key
   if(!r.ok){ $('restartErr').textContent=r.error||'Restart failed.'; return; }
-  opKey=key; try{ localStorage.setItem('ipl_op_key',key); }catch(e){}
+  setKey(key);
   closeModal('restartModal'); Bus.toast('Auction restarted — back to setup','ok');
 };
 
 // key modal
-function showKey(){ $('keyModal').classList.remove('hide'); $('keyInput').focus(); }
-window.saveKey=()=>{ opKey=$('keyInput').value.trim(); LS.set('ipl_op_key',opKey); $('keyModal').classList.add('hide'); Bus.toast('Key saved','ok'); };
+function showKey(){ $('keyInput').value=''; $('keyModal').classList.remove('hide'); setTimeout(()=>$('keyInput').focus(),50); }
+window.saveKey=()=>{ const k=$('keyInput').value.trim(); if(!k){ Bus.toast('Enter the auctioneer key','err'); return; } setKey(k); $('keyModal').classList.add('hide'); Bus.toast('Key saved','ok'); };
 
 boot();

@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Join the auction — IPL Auction 2026</title>
+<link rel="stylesheet" href="app.css">
+<style>
+  body{overflow-x:hidden}
+  .wrap{width:min(1080px,100%);margin:0 auto;padding:0 24px}
+  @media(max-width:640px){.wrap{padding:0 16px}}
+
+  /* ---------- header ---------- */
+  .top{position:sticky;top:0;z-index:40;backdrop-filter:blur(12px);
+    background:rgba(9,13,26,.72);border-bottom:1px solid var(--line)}
+  .top .wrap{display:flex;align-items:center;gap:16px;height:64px}
+  .brand .logo{cursor:pointer}
+  .top .rmeta{margin-left:auto;text-align:right;line-height:1.25}
+  .top .rmeta small{display:block;color:var(--dim);font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase}
+  .top .rmeta b{font-family:var(--f-head);font-weight:600;font-size:15px}
+
+  /* ---------- hero band ---------- */
+  .hb{position:relative;overflow:hidden;padding:44px 0 30px;
+    background:
+      radial-gradient(600px 320px at 18% -10%, rgba(245,197,66,.14), transparent 60%),
+      radial-gradient(620px 380px at 90% 10%, rgba(90,210,255,.14), transparent 62%),
+      linear-gradient(180deg,#0d1428,var(--bg2))}
+  .hb .wrap{position:relative;z-index:1}
+  .kicker{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-head);font-weight:600;
+    font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);
+    border:1px solid rgba(245,197,66,.35);border-radius:999px;padding:6px 12px;background:rgba(245,197,66,.06)}
+  .kicker .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 1.6s infinite}
+  .roomttl{font-family:var(--f-display);font-size:clamp(34px,5.4vw,58px);line-height:.94;letter-spacing:1px;
+    text-transform:uppercase;margin:16px 0 0;
+    background:linear-gradient(120deg,#fff 30%,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .roomsub{color:var(--mut);font-size:15px;line-height:1.6;margin-top:12px;max-width:56ch}
+  .rejoin{margin-top:18px;display:inline-flex}
+
+  /* ---------- team grid ---------- */
+  .main{padding:30px 0 64px}
+  .gridhd{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  .gridhd h2{font-family:var(--f-head);font-weight:600;font-size:20px;margin:0;letter-spacing:.3px}
+  .gridhd .cnt{color:var(--mut);font-size:13px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+
+  .tc{position:relative;padding:20px;overflow:hidden;transition:transform .15s,border-color .15s,box-shadow .15s;
+    display:flex;flex-direction:column;gap:0}
+  .tc::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--tcol,var(--gold))}
+  .tc.open:hover{transform:translateY(-3px);border-color:var(--line2);box-shadow:0 18px 40px rgba(0,0,0,.4)}
+  .tc .crest{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;
+    font-family:var(--f-display);font-size:20px;letter-spacing:.5px;color:#0b1020;
+    background:var(--tcol,var(--gold));box-shadow:0 6px 18px rgba(0,0,0,.35)}
+  .tc .tname{font-family:var(--f-head);font-weight:600;font-size:18px;margin:14px 0 2px;letter-spacing:.3px}
+  .tc .tshort{color:var(--dim);font-size:11.5px;letter-spacing:2px;text-transform:uppercase}
+  .tc .meta{display:flex;gap:18px;margin:16px 0 18px;padding-top:14px;border-top:1px solid var(--line)}
+  .tc .meta div{line-height:1.15}
+  .tc .meta b{display:block;font-family:var(--f-head);font-weight:600;font-size:16px;font-variant-numeric:tabular-nums}
+  .tc .meta span{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--mut)}
+  .tc .btn{width:100%;margin-top:auto}
+
+  .tc.taken{opacity:.62;filter:saturate(.6)}
+  .tc.taken:hover{transform:none}
+  .badge{position:absolute;top:14px;right:14px;font-family:var(--f-head);font-weight:600;font-size:10.5px;
+    letter-spacing:1.5px;text-transform:uppercase;padding:4px 10px;border-radius:999px;
+    background:rgba(255,77,109,.15);color:#ff8ea3;border:1px solid rgba(255,77,109,.35)}
+
+  /* ---------- empty / not-found states ---------- */
+  .state{max-width:560px;margin:60px auto;text-align:center}
+  .state .ic{font-size:40px}
+  .state h2{font-family:var(--f-head);font-weight:600;font-size:22px;margin:14px 0 0}
+  .state p{color:var(--mut);font-size:14.5px;line-height:1.6;margin:12px auto 22px;max-width:44ch}
+  .setup{padding:44px 26px;text-align:center}
+  .setup .pulse{display:inline-flex;align-items:center;gap:9px;color:var(--mut);font-size:14px}
+  .setup .pulse .dot{width:9px;height:9px;border-radius:50%;background:var(--gold);box-shadow:0 0 12px var(--gold);animation:pulse 1.4s infinite}
+  .setup h3{font-family:var(--f-head);font-weight:600;font-size:19px;margin:16px 0 0}
+  .setup p{color:var(--mut);font-size:14px;line-height:1.6;margin:10px auto 0;max-width:46ch}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script src="bus.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const app=$('app');
+const ROOM=Bus.ROOM;
+
+function tokenKey(){ return 'ipl_team_'+ROOM; }
+function idKey(){ return 'ipl_teamid_'+ROOM; }
+function hasToken(){ try{ return !!localStorage.getItem(tokenKey()); }catch(e){ return false; } }
+
+// crest initials from short code or name
+function initials(t){
+  if(t.short) return String(t.short).slice(0,3).toUpperCase();
+  return String(t.name||'?').split(/\s+/).map(w=>w[0]||'').join('').slice(0,3).toUpperCase();
+}
+
+/* ---------- no room in URL ---------- */
+function renderNoRoom(){
+  app.innerHTML=`
+    <div class="wrap">
+      <div class="state">
+        <div class="ic">🔗</div>
+        <h2>Open your auctioneer's join link</h2>
+        <p>This page needs a room. Ask the auctioneer to share their join link, or head back and enter a room code.</p>
+        <a class="btn gold lg" href="index.html">Back to home →</a>
+      </div>
+    </div>`;
+}
+
+/* ---------- room not found ---------- */
+function renderNotFound(){
+  app.innerHTML=`
+    <div class="wrap">
+      <div class="state">
+        <div class="ic">🚫</div>
+        <h2>Room not found</h2>
+        <p>We couldn't find room <b>${Bus.esc(ROOM)}</b>. Double-check the code or link with your auctioneer.</p>
+        <a class="btn gold lg" href="index.html">Back to home →</a>
+      </div>
+    </div>`;
+}
+
+/* ---------- shell (header + hero + team slot) ---------- */
+function renderShell(name){
+  const rejoin = hasToken()
+    ? `<a class="btn green rejoin" href="team.html?room=${encodeURIComponent(ROOM)}">Rejoin as your team →</a>` : '';
+  app.innerHTML=`
+    <header class="top">
+      <div class="wrap">
+        <div class="brand" onclick="location.href='index.html'">
+          <div class="logo">IPL</div>
+          <div><small>Auction League</small><div class="brandttl">Join the auction</div></div>
+        </div>
+        <div class="rmeta"><small>Room</small><b>${Bus.esc(ROOM)}</b></div>
+      </div>
+    </header>
+
+    <section class="hb">
+      <div class="wrap">
+        <span class="kicker"><span class="dot"></span> You're in the room</span>
+        <h1 class="roomttl">${Bus.esc(name||ROOM)}</h1>
+        <p class="roomsub">Pick your franchise below to bid live. Teams are claimed first-come-first-served —
+          once a team is taken it's locked to that device.</p>
+        ${rejoin}
+      </div>
+    </section>
+
+    <main class="main">
+      <div class="wrap"><div id="slot"></div></div>
+    </main>`;
+}
+
+/* ---------- team grid / empty state ---------- */
+function renderTeams(snap){
+  const slot=$('slot');
+  if(!slot) return;
+  const teams=(snap&&snap.teams)||[];
+  if(!teams.length){
+    slot.innerHTML=`
+      <div class="panel setup">
+        <div class="pulse"><span class="dot"></span> Live · updating automatically</div>
+        <h3>The auctioneer is still setting up teams</h3>
+        <p>Hang tight — franchises will appear here the moment they're added. No need to refresh.</p>
+      </div>`;
+    return;
+  }
+  const avail=teams.filter(t=>!t.claimed).length;
+  const cards=teams.map(t=>{
+    const col=Bus.esc(t.color||'#f5c542');
+    const taken=!!t.claimed;
+    return `
+      <div class="panel tc ${taken?'taken':'open'}" style="--tcol:${col}">
+        ${taken?'<span class="badge">Taken</span>':''}
+        <div class="crest" style="background:${col}">${Bus.esc(initials(t))}</div>
+        <div class="tname">${Bus.esc(t.name)}</div>
+        <div class="tshort">${Bus.esc(t.short||'')}</div>
+        <div class="meta">
+          <div><b>${Bus.fmtL(t.remaining)}</b><span>Purse left</span></div>
+          <div><b>${Number(t.count||0)}</b><span>Squad</span></div>
+        </div>
+        ${taken
+          ? `<button class="btn" disabled>Claimed</button>`
+          : `<button class="btn green" onclick="claim(${Number(t.teamId)})">Claim this team →</button>`}
+      </div>`;
+  }).join('');
+  slot.innerHTML=`
+    <div class="gridhd">
+      <h2>Pick your team</h2>
+      <span class="cnt">${avail} of ${teams.length} available</span>
+    </div>
+    <div class="grid">${cards}</div>`;
+}
+
+/* ---------- claim handler ---------- */
+window.claim=async(teamId)=>{
+  const r=await Bus.claimTeam(teamId);
+  if(r&&r.ok){
+    try{
+      localStorage.setItem(tokenKey(), r.token);
+      localStorage.setItem(idKey(), String(teamId));
+    }catch(e){}
+    location.href='team.html?room='+encodeURIComponent(ROOM);
+    return;
+  }
+  Bus.toast((r&&r.error)||'Could not claim','err');
+};
+
+/* ---------- boot ---------- */
+(async function boot(){
+  if(!ROOM){ renderNoRoom(); return; }
+  const info=await Bus.roomInfo(ROOM);
+  if(!info||!info.ok){ renderNotFound(); return; }
+  renderShell(info.name);
+  Bus.connect(renderTeams, Bus.connBadge);
+})();
+</script>
+</body>
+</html>
