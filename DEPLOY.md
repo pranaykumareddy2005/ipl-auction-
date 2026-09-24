@@ -15,20 +15,20 @@ git clone <your repo> ipl-auction && cd ipl-auction
 npm ci                       # installs pg (the only runtime dep)
 cp .env.example .env         # then edit .env with your Supabase creds
 ```
-`.env` (never commit it):
+`.env` (never commit it) — uses the **Session Pooler (IPv4)**, required on an IPv4-only VPS:
 ```
-PGHOST=db.<ref>.supabase.co        # or the Session Pooler host if your VPS is IPv4-only
+PGHOST=aws-0-ap-south-1.pooler.supabase.com   # Session Pooler = IPv4 proxied (free)
 PGPORT=5432
 PGDATABASE=postgres
-PGUSER=postgres
+PGUSER=postgres.<ref>                          # pooler user is postgres.<project-ref>
 PGPASSWORD=<your db password>
 PGSSL=require
 PORT=3000
 TRUST_PROXY=1     # required behind nginx/Caddy so rate limits see the real client IP
 ```
-> **IPv4 note:** the direct `db.<ref>.supabase.co` host is often IPv6-only. If the
-> VPS can't reach it, use Supabase's **Session Pooler** connection (host
-> `aws-0-<region>.pooler.supabase.com`, port `5432`, user `postgres.<ref>`).
+> **IPv4/IPv6:** the direct host `db.<ref>.supabase.co` is IPv6-only. The Session
+> Pooler above is IPv4-proxied for free (Supabase dashboard → Database → Connection
+> string → Session pooler). Use the direct host only if the VPS has IPv6.
 
 ## 3. Create the schema (once)
 ```bash
