@@ -31,6 +31,7 @@ let teamDraft = DEFAULT_TEAMS.map((t,i)=>({id:i,name:t[0],short:t[1],color:t[2],
 
 let pinMap = {};        // teamId -> passcode (loaded from the host-only endpoint)
 let _presSig = '';      // last-seen presence signature (presence changes don't bump rev)
+let _prevJoined = null;  // teams that had joined on the previous snapshot (for join/leave toasts)
 
 // Load every team's passcode (host key required). Safe to call repeatedly.
 async function loadPins(){
@@ -47,18 +48,23 @@ function renderLobby(s){
   const ops = (s && s.presence && s.presence.operators) || 0;
   if(!teams.length){ box.innerHTML='<div class="dim" style="padding:10px">Save your teams above, then each team\'s passcode appears here.</div>';
     $('lobbySummary').textContent='No teams yet — save teams to generate passcodes.'; return; }
+  const joinedCount = teams.filter(t=>t.claimed).length;
   const onCount = teams.filter(t=>online.has(Number(t.teamId))).length;
-  $('lobbySummary').innerHTML = `<b style="color:var(--gold)">${onCount}</b> of ${teams.length} teams online`
+  $('lobbySummary').innerHTML = `<b style="color:#7ee0a1">${joinedCount}</b> of ${teams.length} teams joined`
+    + ` · <b style="color:var(--gold)">${onCount}</b> online now`
     + ` · operator console ${ops>0?'<b style="color:#7ee0a1">connected</b>':'offline'}`;
   box.innerHTML = teams.map(t=>{
     const id=Number(t.teamId); const isOn=online.has(id);
     const pin = pinMap[id] || '——';
+    const label = isOn ? '✓ Joined · online' : (t.claimed ? '✓ Joined · reconnecting…' : 'Waiting to join');
+    const col = isOn ? '#7ee0a1' : (t.claimed ? '#e0c07e' : 'var(--mut)');
+    const bg = isOn ? '#123a24' : (t.claimed ? '#3a2a12' : '#2a2030');
     return `<div class="qitem">
       <span class="sw" style="width:12px;height:12px;border-radius:3px;background:${esc(t.color||'#888')}"></span>
       <span class="nm">${esc(t.name)}
-        <span class="tag" style="background:${isOn?'#123a24':'#2a2030'};color:${isOn?'#7ee0a1':'var(--mut)'};font-weight:700">${isOn?'● Online':(t.claimed?'○ Claimed · away':'○ Not joined')}</span>
+        <span class="tag" style="background:${bg};color:${col};font-weight:700">${label}</span>
       </span>
-      <span class="mono" style="letter-spacing:2px;font-size:15px">${esc(pin)}</span>
+      <span class="tag" title="Team passcode" style="background:#161a26;color:#cbd3ea;font-weight:700;letter-spacing:2px;font-size:15px">🔑 ${esc(pin)}</span>
       <button class="btn sm ghost" onclick="doRegen(${id})">Regenerate</button>
     </div>`;
   }).join('');
@@ -128,7 +134,17 @@ function onState(s) {
   // Presence (who's online) changes WITHOUT bumping rev, so refresh the lobby +
   // live team list whenever it moves, independent of the heavy-rebuild guard below.
   const pres = s.presence || { teams: [], operators: 0 };
-  const psig = (pres.teams || []).slice().sort((a,b)=>a-b).join(',') + '|' + pres.operators;
+  const onlineSet = new Set((pres.teams || []).map(Number));
+  const joinedSet = new Set((s.teams || []).filter((t) => t.claimed).map((t) => Number(t.teamId)));
+  // "Joined X/N" chip in the top bar — the at-a-glance "who's in the auction".
+  const jv = $('joinedVal');
+  if (jv) { jv.textContent = `${joinedSet.size}/${(s.teams || []).length}`; const ch = $('joinedChip'); if (ch) ch.style.borderColor = joinedSet.size ? 'rgba(46,204,113,.5)' : ''; }
+  // Announce joins/leaves so the auctioneer always knows who just came in.
+  if (_prevJoined) {
+    for (const t of (s.teams || [])) { const id = Number(t.teamId); if (t.claimed && !_prevJoined.has(id)) Bus.toast('🟢 ' + t.name + ' joined the auction', 'ok'); if (!t.claimed && _prevJoined.has(id)) Bus.toast('⚪ ' + t.name + ' left', ''); }
+  }
+  _prevJoined = joinedSet;
+  const psig = [...onlineSet].sort((a,b)=>a-b).join(',') + '|' + pres.operators + '|' + [...joinedSet].sort((a,b)=>a-b).join(',');
   if (psig !== _presSig) { _presSig = psig; renderLobby(s); if (s.phase !== 'setup') renderTeamsList(s); }
   // DB-write health: warn the operator if writes are failing (don't restart mid-outage).
   const dw = $('dbWarn');
@@ -374,17 +390,18 @@ function renderHeld(s){
 function renderTeamsList(s){
   const online=new Set(((s.presence&&s.presence.teams)||[]).map(Number));
   $('teamsList').innerHTML=s.teams.map(t=>{
-    const isOn=online.has(Number(t.teamId));
+    const id=Number(t.teamId); const isOn=online.has(id); const pin=pinMap[id]||'——';
     const status = isOn
-      ? `<span class="tag" style="background:#123a24;color:#7ee0a1;font-weight:700">● Online</span>
+      ? `<span class="tag" style="background:#123a24;color:#7ee0a1;font-weight:700">✓ Joined · online</span>
          <button class="btn sm red ghost" onclick="doRelease(${t.teamId})">Release</button>`
       : t.claimed
-      ? `<span class="tag" style="background:#3a2a12;color:#e0c07e;font-weight:700">Away</span>
+      ? `<span class="tag" style="background:#3a2a12;color:#e0c07e;font-weight:700">✓ Joined · reconnecting…</span>
          <button class="btn sm red ghost" onclick="doRelease(${t.teamId})">Release</button>`
-      : `<span class="tag" style="background:#20263a;color:var(--mut)">Not joined</span>`;
+      : `<span class="tag" style="background:#20263a;color:var(--mut)">Waiting to join</span>`;
     return `<div class="qitem">
     <span class="sw" style="width:12px;height:12px;border-radius:3px;background:${esc(t.color||'#888')}"></span>
     <span class="nm">${esc(t.name)} <span class="dim">· ${t.count}p · ${t.overseas}os</span></span>
+    <span class="tag" title="Team passcode — give this to the captain" style="background:#161a26;color:#cbd3ea;font-weight:700;letter-spacing:2px">🔑 ${esc(pin)}</span>
     ${status}
     <span class="mono">${fmtL(t.remaining)}</span></div>`;
   }).join('');
