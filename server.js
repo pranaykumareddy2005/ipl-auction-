@@ -309,6 +309,12 @@ const server = http.createServer(async (req, res) => {
       if (body.name === 'stopTimer') { engine.stopTimer(); return sendJSON(res, 200, { ok: true }); }
       const result = engine.command(body.name, body.payload || {}, { actor: 'operator' });
       if (!result.ok) return sendJSON(res, 409, { ok: false, error: result.error });
+      // Bids are the high-frequency hot path: state is applied + broadcast synchronously
+      // inside command(), so ack INSTANTLY and let the DB write finish in the background
+      // (serialized by the engine). The final SOLD event is self-contained (carries
+      // teamId+price), so a lost intermediate bid never changes the outcome. Consequential
+      // commands (sold/present/reopen/…) still await durably below.
+      if (body.name === 'placeBid') { if (result.write) result.write.catch(() => {}); return sendJSON(res, 200, { ok: true, rev: result.rev }); }
       let warning;
       try { await result.write; } catch (e) { warning = 'Applied locally but not saved to the database — check the connection'; }
       return sendJSON(res, 200, warning ? { ok: true, rev: result.rev, warning } : { ok: true, rev: result.rev });
@@ -365,9 +371,10 @@ const server = http.createServer(async (req, res) => {
       if (body && body.expectedSr != null) payload.expectedSr = Number(body.expectedSr);
       const result = engine.command('placeBid', payload, { actor: `team:${teamId}` });
       if (!result.ok) return sendJSON(res, 409, { ok: false, error: result.error });
-      let warning;
-      try { await result.write; } catch (e) { warning = 'Bid applied but not saved — check the connection'; }
-      return sendJSON(res, 200, warning ? { ok: true, rev: result.rev, warning } : { ok: true, rev: result.rev });
+      // Instant ack: state applied + broadcast already; persist in the background so a
+      // burst of taps never waits on the DB round-trip (the anti-lag hot path).
+      if (result.write) result.write.catch(() => {});
+      return sendJSON(res, 200, { ok: true, rev: result.rev });
     }
 
     return sendJSON(res, 404, { ok: false, error: 'Unknown room route' });
