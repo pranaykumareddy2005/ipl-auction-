@@ -257,16 +257,22 @@ function noise(start,dur,vol,cut){
   const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=cut||1600;
   n.connect(f); f.connect(g); g.connect(master); n.start(t0);
 }
+// Real audio clips: the "gavel of justice" bang on SOLD/UNSOLD, the IPL theme on
+// auction complete. Cloned per play so rapid resolutions can overlap cleanly.
+let _gavelEl=null, _themeEl=null;
+try{ _gavelEl=new Audio('/sfx/gavel.mp3'); _gavelEl.preload='auto'; }catch(e){}
+try{ _themeEl=new Audio('/sfx/ipl_theme.mp3'); _themeEl.preload='auto'; }catch(e){}
+function playClip(el,vol){ if(!sndOn||!el)return; try{ const a=el.cloneNode(); a.volume=vol==null?0.9:vol; a.play().catch(()=>{}); }catch(e){ try{ el.currentTime=0; el.play().catch(()=>{}); }catch(_){} } }
+function gavel(){ playClip(_gavelEl,0.9); }
+function playTheme(){ if(!sndOn||!_themeEl)return; try{ _themeEl.currentTime=0; _themeEl.volume=0.85; _themeEl.play().catch(()=>{}); }catch(e){} }
 const SFX={
   bid(){ if(!sndOn||!AC)return; tone(880,0,0.07,'triangle',0.22); tone(1320,0.045,0.11,'triangle',0.18); },
-  sold(){ if(!sndOn||!AC)return;                       // gavel knock ×2, then a bright fanfare
-    noise(0,0.10,0.7,1200); tone(150,0.01,0.16,'square',0.5);
-    noise(0.14,0.10,0.7,1200); tone(150,0.15,0.16,'square',0.5);
-    [523,659,784,1047].forEach((f,i)=>tone(f,0.42+i*0.09,0.55,'triangle',0.24)); },
-  unsold(){ if(!sndOn||!AC)return; tone(320,0,0.22,'sawtooth',0.32); tone(200,0.2,0.42,'sawtooth',0.3); },
+  sold(){ gavel(); },                                   // real gavel bang
+  unsold(){ gavel(); },                                 // gavel bang for unsold too
   skip(){ if(!sndOn||!AC)return; tone(520,0,0.07,'sine',0.2); tone(390,0.08,0.1,'sine',0.16); },
   tick(){ if(!sndOn||!AC)return; tone(1000,0,0.04,'square',0.13); },
-  hooter(){ if(!sndOn||!AC)return; tone(1500,0,0.35,'square',0.3); }
+  hooter(){ if(!sndOn||!AC)return; tone(1500,0,0.35,'square',0.3); },
+  theme:playTheme
 };
 window.toggleSound=()=>{
   initAudio(); if(AC.state==='suspended') AC.resume();
@@ -275,9 +281,14 @@ window.toggleSound=()=>{
   if(sndOn) SFX.bid();
 };
 
+let _prevPhase=null;
 function render(s){
   snap=s;
   const ph=s.phase;
+  // IPL theme plays once when the auction wraps (setup/live/paused → complete),
+  // not on a reconnect that loads an already-complete auction.
+  if(_prevPhase!==null && _prevPhase!=='complete' && ph==='complete') SFX.theme();
+  _prevPhase=ph;
   $('phase').className='pill '+ph;
   $('phaseText').textContent={setup:'Setup',live:'Live',paused:'Paused',complete:'Complete'}[ph]||ph;
   { let el=document.getElementById('resultsCta');
@@ -448,9 +459,7 @@ setInterval(()=>{
     ring.style.setProperty('--p',dur?(rem/dur*100):0);
     ring.style.filter = sec<=5 ? 'drop-shadow(0 0 12px #e63946)' : 'none';
     if(sec!==lastSec){
-      if(sec<=5 && sec>0) SFX.tick();
-      else if(sec===0 && lastSec>0) SFX.hooter();
-      lastSec=sec;
+      lastSec=sec; // countdown is silent — the gavel is the only resolution sound
     }
   } else { num.textContent='—'; ring.style.setProperty('--p',0); ring.style.filter='none'; lastSec=null; }
 },100);

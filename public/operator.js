@@ -88,6 +88,7 @@ async function cmd(name, payload) {
 async function boot() {
   if (!Bus.ROOM) return;
   initShare();
+  syncSoundBtn();
   if (!getKey()) showKey();
   const d = await Bus.getJSON('/api/players');   // global player catalog (not room-scoped)
   catalog = d.players; cats = d.cats; window.__stars = d.stars || {};
@@ -127,7 +128,7 @@ window.copyField=async(inputId, btn)=>{
   setTimeout(()=>{ btn.textContent=label; },1400);
 };
 
-let _lastRev = -1, _lastPhase = '';
+let _lastRev = -1, _lastPhase = '', _lastResultTs = null;
 function onState(s) {
   snap = s;
   timerSync(s); // keep the countdown in sync cheaply, every snapshot
@@ -156,6 +157,14 @@ function onState(s) {
   // Skip the heavy DOM rebuild when nothing actually changed (e.g. per-second
   // timer ticks): rev only advances on real events. The 200ms timer loop still
   // updates the countdown locally.
+  // Auctioneer gavel: bang on a freshly resolved player (sold → gavel, unsold → buzzer).
+  // Guard on the last-result timestamp so it fires once per resolution, and never on the
+  // first snapshot / a reconnect replay of an older result.
+  const lr = s.lastResult;
+  if (lr && lr.ts && lr.ts !== _lastResultTs) {
+    if (_lastResultTs !== null) { if (lr.kind === 'sold') SFX.gavel(); else if (lr.kind === 'unsold') SFX.unsold(); }
+    _lastResultTs = lr.ts;
+  }
   if (s.rev === _lastRev && s.phase === _lastPhase) return;
   _lastRev = s.rev; _lastPhase = s.phase;
   $('phase').className = 'pill ' + s.phase;
@@ -490,7 +499,21 @@ window.presentPick=async(sr)=>{ await cmd('setNext',{sr}); const r=await cmd('pr
 let endsAt=null,dur=0;
 function timerSync(s){ const t=s.timer; if(t&&t.running&&t.remainingMs>0){endsAt=Date.now()+t.remainingMs;dur=t.durationMs;} else if(!(t&&t.running)){endsAt=null;} }
 let wasTimeUp=false, _actx;
-function beep(){ try{ _actx=_actx||new (window.AudioContext||window.webkitAudioContext)(); const o=_actx.createOscillator(),g=_actx.createGain(); o.frequency.value=880; o.connect(g); g.connect(_actx.destination); g.gain.setValueAtTime(0.0001,_actx.currentTime); g.gain.exponentialRampToValueAtTime(0.25,_actx.currentTime+0.01); g.gain.exponentialRampToValueAtTime(0.0001,_actx.currentTime+0.35); o.start(); o.stop(_actx.currentTime+0.36);}catch(e){} }
+// ── Auctioneer gavel: the real "gavel of justice" clip on SOLD and UNSOLD.
+// ON by default; the operator's own button clicks satisfy the browser autoplay rule.
+let sndOn=true; try{ sndOn = (localStorage.getItem('ipl_op_snd')!=='0'); }catch(e){}
+let _gavel=null;
+try{ _gavel=new Audio('/sfx/gavel.mp3'); _gavel.preload='auto'; }catch(e){}
+// Play the gavel from the start, allowing rapid back-to-back bangs by cloning.
+function playGavel(){
+  if(!sndOn||!_gavel)return;
+  try{ const a=_gavel.cloneNode(); a.volume=0.9; a.play().catch(()=>{}); }
+  catch(e){ try{ _gavel.currentTime=0; _gavel.play().catch(()=>{}); }catch(_){} }
+}
+const SFX={ gavel:playGavel, unsold:playGavel };
+window.toggleOpSound=()=>{ sndOn=!sndOn; try{ localStorage.setItem('ipl_op_snd', sndOn?'1':'0'); }catch(e){} syncSoundBtn(); if(sndOn) playGavel(); };
+function syncSoundBtn(){ const b=$('opSndBtn'); if(b){ b.textContent=sndOn?'🔨 Gavel on':'🔇 Gavel off'; b.className='btn sm '+(sndOn?'gold':'ghost'); } }
+function beep(){ try{ _actx=_actx||new (window.AudioContext||window.webkitAudioContext)(); if(_actx.state==='suspended')_actx.resume(); const o=_actx.createOscillator(),g=_actx.createGain(); o.frequency.value=880; o.connect(g); g.connect(_actx.destination); g.gain.setValueAtTime(0.0001,_actx.currentTime); g.gain.exponentialRampToValueAtTime(0.25,_actx.currentTime+0.01); g.gain.exponentialRampToValueAtTime(0.0001,_actx.currentTime+0.35); o.start(); o.stop(_actx.currentTime+0.36);}catch(e){} }
 function clearTimeUp(){ const s=$('soldBtn'),u=$('unsoldBtn'),m=$('timerMsg'),el=$('timerNum'); if(el)el.classList.remove('timeup'); if(m)m.style.display='none'; if(s)s.classList.remove('pulse'); if(u)u.classList.remove('pulse'); wasTimeUp=false; }
 setInterval(()=>{ const el=$('timerNum'); if(!el)return;
   const onBlock=!!(snap&&snap.current);
@@ -502,7 +525,7 @@ setInterval(()=>{ const el=$('timerNum'); if(!el)return;
       el.textContent='0'; el.classList.add('timeup');
       const m=$('timerMsg'); if(m){ m.textContent=hasBid?'⏰ Time up — hit SOLD':'⏰ Time up — no bids'; m.style.display=''; }
       const s=$('soldBtn'),u=$('unsoldBtn'); if(s)s.classList.toggle('pulse',hasBid); if(u)u.classList.toggle('pulse',!hasBid);
-      if(!wasTimeUp){ beep(); wasTimeUp=true; }
+      if(!wasTimeUp){ wasTimeUp=true; } // visual pulse only — no buzzer; gavel marks the sale
     } else { clearTimeUp(); }
   }
   else { el.textContent='—'; el.style.color=''; clearTimeUp(); } },200);
