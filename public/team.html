@@ -216,7 +216,7 @@ function boot(){
 }
 if(boot()){
   Bus.getJSON('/api/players').then(d=>{cats=d.cats;if(snap)render(snap);}).catch(()=>{});
-  Bus.connect(render, on=>Bus.connBadge(on));
+  Bus.connect(render, on=>Bus.connBadge(on), { role:'team', teamId:myTeam, token });
 }
 
 let _lastRev=-1,_lastPhase='';
@@ -347,20 +347,31 @@ function renderBidBar(s,t){
   else if(overCap){ label='Overseas limit'; }
   else if(!afford){ label="Can't afford"; }
   else { disabled=false; label='BID '+Bus.fmtL(nextAmt); }
-  btn.disabled=disabled || bidBusy; btn.className='bidbtn '+cls; if(!bidBusy) btn.textContent=label;
+  btn.disabled = disabled || bidBusy;
+  btn.className='bidbtn '+cls;
+  if(!bidBusy) btn.textContent=label;
 }
 
+// Continuous bidding is fine and expected — people WILL mash. We only prevent
+// OVERLAPPING sends (one request in flight at a time); the instant it returns you
+// can bid again, so a fast war stays responsive. The server is the referee: it's
+// single-threaded and rejects a team out-bidding itself, so any extra mash-tap that
+// lands right after you take the lead is harmless — we just swallow it silently
+// instead of flashing an error.
 let bidBusy=false;
 window.placeBid=async()=>{
-  if(bidBusy) return; bidBusy=true;
+  if(bidBusy) return;                                   // don't stack duplicate requests
+  bidBusy=true;
   const btn=$('bidbtn'); btn.disabled=true; btn.textContent='…';
   const expectedSr = (snap && snap.current) ? snap.current.sr : null;
-  const r=await Bus.teamBid(token, null, expectedSr); bidBusy=false;
+  const r=await Bus.teamBid(token, null, expectedSr);
+  bidBusy=false;
   if(!r.ok){
     if(/session expired|rejoin/i.test(r.error||'')){ toJoin(); return; }
-    Bus.toast(r.error||'Bid rejected','err');
-  } else { Bus.toast(r.warning ? ('⚠ '+r.warning) : 'Bid placed! 🔨', r.warning?'err':'ok'); }
-  if(snap) render(snap);
+    if(/already.*lead|leading bid/i.test(r.error||'')){ /* late tap — you already lead; ignore */ }
+    else Bus.toast(r.error||'Bid rejected','err');
+  } else if(r.warning){ Bus.toast('⚠ '+r.warning,'err'); }   // success is obvious from the live bid; only warn on trouble
+  if(snap) render(snap);                                 // re-enable immediately for the next raise
 };
 
 /* ---------- photo (identical behaviour to the presentation screen) ---------- */

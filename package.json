@@ -8,7 +8,9 @@
     "start": "node server.js",
     "db:init": "node scripts/db-init.js",
     "simulate": "node scripts/simulate.js",
-    "test": "node scripts/simulate.js"
+    "test": "node scripts/simulate.js",
+    "loadtest": "node test/run.js",
+    "livetest": "node test/livetest.js"
   },
   "engines": {
     "node": ">=18"

@@ -141,7 +141,7 @@
           <button class="btn sm" onclick="addTeam()">+ Add team</button>
           <button class="btn sm ghost" onclick="resetTeams()">Reset to 10 IPL teams</button>
         </div>
-        <p class="dim" style="font-size:12px;margin:10px 0 0">Team reps join from the <b>Team join link</b> above — they open it on their phone, claim their team, and can bid live from the web. Cards raised in the room are still entered here. You can see who has joined, and free up a team, under the live <b>Teams</b> tab.</p>
+        <p class="dim" style="font-size:12px;margin:10px 0 0">Team reps join from the <b>Team join link</b> above — they pick their franchise and enter its <b>passcode</b> (shown in the Room lobby below) on their phone, then bid live. If a rep gets logged out or switches phones, the same passcode gets them straight back in. Cards raised in the room are still entered here.</p>
       </div>
       <div class="panel">
         <div class="card-title">Auction settings</div>
@@ -157,6 +157,13 @@
           <button class="btn blue" onclick="saveSettings()">Save settings & teams</button>
           <p class="dim" style="font-size:12px;margin:0">Purse is entered in crore, stored in lakh internally. Teams and settings lock once the auction starts.</p>
         </div>
+      </div>
+
+      <div class="panel" style="grid-column:1/-1">
+        <div class="card-title">Room lobby — who's in the room &amp; team passcodes</div>
+        <div id="lobbySummary" class="dim" style="font-size:13px;margin:2px 0 12px">Waiting for teams to join…</div>
+        <div class="list" id="lobbyList"></div>
+        <p class="dim" style="font-size:12px;margin:10px 0 0">Green = that team is online right now. Hand each rep their franchise + passcode. <b>Regenerate</b> makes a new passcode and signs out that team's current device.</p>
       </div>
     </div>
 

@@ -30,10 +30,22 @@
   }
 
   // ---- live state for the current room ----
-  function connect(onState, onConn) {
+  // identity (optional) declares who this screen is so it shows up in room presence:
+  //   { role:'team', teamId, token } | { role:'operator', key } | { role:'screen' }
+  function connect(onState, onConn, identity) {
     let es;
+    function streamUrl() {
+      const q = new URLSearchParams();
+      if (identity && identity.role) {
+        q.set('role', identity.role);
+        if (identity.role === 'team') { q.set('team', identity.teamId); q.set('token', identity.token || ''); }
+        else if (identity.role === 'operator') { q.set('key', identity.key || ''); }
+      }
+      const qs = q.toString();
+      return base() + '/stream' + (qs ? '?' + qs : '');
+    }
     function open() {
-      es = new EventSource(base() + '/stream');
+      es = new EventSource(streamUrl());
       es.onopen = () => onConn && onConn(true);
       es.onmessage = (e) => { try { onState(JSON.parse(e.data)); } catch (err) {} };
       es.onerror = () => { onConn && onConn(false); };
@@ -54,15 +66,32 @@
     } catch (e) { return { ok: false, error: 'Network error — is the server running?' }; }
   }
 
-  // ---- team join (FCFS claim, no PIN) + bidding ----
-  async function claimTeam(teamId) {
+  // ---- team join / rejoin (team + passcode) + bidding ----
+  async function joinTeam(teamId, pin) {
     try {
-      const r = await fetch(base() + '/team/claim', {
+      const r = await fetch(base() + '/team/join', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId }),
+        body: JSON.stringify({ teamId, pin }),
       });
       return await r.json();
     } catch (e) { return { ok: false, error: 'Network error — is the server running?' }; }
+  }
+
+  // ---- operator: view / rotate team passcodes ----
+  async function teamsAuth(opKey) {
+    try {
+      const r = await fetch(base() + '/teams-auth', { headers: { 'x-op-key': opKey || '' } });
+      return await r.json();
+    } catch (e) { return { ok: false, error: 'Network error' }; }
+  }
+  async function regenPin(teamId, opKey) {
+    try {
+      const r = await fetch(base() + '/team/regen-pin', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-op-key': opKey || '' },
+        body: JSON.stringify({ teamId }),
+      });
+      return await r.json();
+    } catch (e) { return { ok: false, error: 'Network error' }; }
   }
   async function releaseTeam(teamId, opKey) {
     try {
@@ -106,7 +135,7 @@
     ROOM, base, fmtL, esc, getJSON,
     createRoom, roomInfo,
     connect, state, command,
-    claimTeam, releaseTeam, teamBid,
+    joinTeam, releaseTeam, teamBid, teamsAuth, regenPin,
     toast, connBadge,
   };
 })(window);

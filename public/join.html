@@ -58,11 +58,15 @@
   .tc .meta span{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--mut)}
   .tc .btn{width:100%;margin-top:auto}
 
-  .tc.taken{opacity:.62;filter:saturate(.6)}
-  .tc.taken:hover{transform:none}
+  .tc.taken{opacity:.9}
   .badge{position:absolute;top:14px;right:14px;font-family:var(--f-head);font-weight:600;font-size:10.5px;
     letter-spacing:1.5px;text-transform:uppercase;padding:4px 10px;border-radius:999px;
     background:rgba(255,77,109,.15);color:#ff8ea3;border:1px solid rgba(255,77,109,.35)}
+  .badge.on{background:rgba(46,204,113,.16);color:#7ee2a8;border:1px solid rgba(46,204,113,.4)}
+  .pin-in{width:100%;box-sizing:border-box;margin:0 0 10px;padding:11px 12px;border-radius:12px;
+    background:rgba(255,255,255,.04);border:1px solid var(--line);color:inherit;font-size:15px;
+    letter-spacing:3px;text-align:center;font-family:var(--f-head)}
+  .pin-in:focus{outline:none;border-color:var(--gold);background:rgba(255,255,255,.06)}
 
   /* ---------- empty / not-found states ---------- */
   .state{max-width:560px;margin:60px auto;text-align:center}
@@ -141,8 +145,8 @@ function renderShell(name){
       <div class="wrap">
         <span class="kicker"><span class="dot"></span> You're in the room</span>
         <h1 class="roomttl">${Bus.esc(name||ROOM)}</h1>
-        <p class="roomsub">Pick your franchise below to bid live. Teams are claimed first-come-first-served —
-          once a team is taken it's locked to that device.</p>
+        <p class="roomsub">Pick your franchise, enter your team passcode, and you're in. Lost your device or
+          got logged out? Just enter the passcode again from any phone to pick up right where you left off.</p>
         ${rejoin}
       </div>
     </section>
@@ -166,13 +170,18 @@ function renderTeams(snap){
       </div>`;
     return;
   }
-  const avail=teams.filter(t=>!t.claimed).length;
+  const online=new Set(((snap&&snap.presence&&snap.presence.teams)||[]).map(Number));
+  const onlineCount=teams.filter(t=>online.has(Number(t.teamId))).length;
   const cards=teams.map(t=>{
     const col=Bus.esc(t.color||'#f5c542');
+    const id=Number(t.teamId);
+    const isOnline=online.has(id);
     const taken=!!t.claimed;
+    const status=isOnline?'<span class="badge on">● Online</span>'
+                :taken?'<span class="badge">Claimed · offline</span>':'';
     return `
       <div class="panel tc ${taken?'taken':'open'}" style="--tcol:${col}">
-        ${taken?'<span class="badge">Taken</span>':''}
+        ${status}
         <div class="crest" style="background:${col}">${Bus.esc(initials(t))}</div>
         <div class="tname">${Bus.esc(t.name)}</div>
         <div class="tshort">${Bus.esc(t.short||'')}</div>
@@ -180,22 +189,26 @@ function renderTeams(snap){
           <div><b>${Bus.fmtL(t.remaining)}</b><span>Purse left</span></div>
           <div><b>${Number(t.count||0)}</b><span>Squad</span></div>
         </div>
-        ${taken
-          ? `<button class="btn" disabled>Claimed</button>`
-          : `<button class="btn green" onclick="claim(${Number(t.teamId)})">Claim this team →</button>`}
+        <input id="pin_${id}" class="pin-in" inputmode="numeric" autocomplete="off"
+               maxlength="8" placeholder="Team passcode"
+               onkeydown="if(event.key==='Enter')join(${id})" />
+        <button class="btn green" onclick="join(${id})">${taken?'Rejoin →':'Join this team →'}</button>
       </div>`;
   }).join('');
   slot.innerHTML=`
     <div class="gridhd">
       <h2>Pick your team</h2>
-      <span class="cnt">${avail} of ${teams.length} available</span>
+      <span class="cnt">${onlineCount} of ${teams.length} online</span>
     </div>
     <div class="grid">${cards}</div>`;
 }
 
-/* ---------- claim handler ---------- */
-window.claim=async(teamId)=>{
-  const r=await Bus.claimTeam(teamId);
+/* ---------- join / rejoin handler (team + passcode) ---------- */
+window.join=async(teamId)=>{
+  const el=$('pin_'+teamId);
+  const pin=(el&&el.value||'').trim();
+  if(!pin){ Bus.toast('Enter your team passcode','err'); if(el) el.focus(); return; }
+  const r=await Bus.joinTeam(teamId, pin);
   if(r&&r.ok){
     try{
       localStorage.setItem(tokenKey(), r.token);
@@ -204,7 +217,8 @@ window.claim=async(teamId)=>{
     location.href='team.html?room='+encodeURIComponent(ROOM);
     return;
   }
-  Bus.toast((r&&r.error)||'Could not claim','err');
+  Bus.toast((r&&r.error)||'Could not join','err');
+  if(el){ el.value=''; el.focus(); }
 };
 
 /* ---------- boot ---------- */

@@ -22,12 +22,23 @@ create table if not exists events (
 );
 create index if not exists events_room_seq on events(room_code, seq);
 
--- First-come-first-served team claims. A row = team is taken; nonce signs its token.
+-- Team session claims. A row = team currently has an active captain session; the
+-- nonce signs that session's bearer token (rotating it invalidates old devices).
 create table if not exists claims (
   room_code   text    not null references rooms(code) on delete cascade,
   team_id     integer not null,
   nonce       text    not null,
   claimed_at  timestamptz not null default now(),
+  primary key (room_code, team_id)
+);
+
+-- Per-team passcodes. A captain proves "I am team X" with team_id + pin, which lets
+-- them join OR rejoin from ANY device (not just the browser that first claimed).
+create table if not exists team_auth (
+  room_code   text    not null references rooms(code) on delete cascade,
+  team_id     integer not null,
+  pin         text    not null,
+  updated_at  timestamptz not null default now(),
   primary key (room_code, team_id)
 );
 
@@ -52,7 +63,7 @@ create index if not exists chat_room_ts on chat(room_code, ts);
   console.log('  ✓ Connected:', p.version.split(',')[0]);
   await pool.query(SCHEMA);
   const { rows } = await pool.query(
-    "select table_name from information_schema.tables where table_schema='public' and table_name in ('rooms','events','claims','chat') order by table_name"
+    "select table_name from information_schema.tables where table_schema='public' and table_name in ('rooms','events','claims','chat','team_auth') order by table_name"
   );
   console.log('  ✓ Tables ready:', rows.map((r) => r.table_name).join(', '));
   await pool.end();

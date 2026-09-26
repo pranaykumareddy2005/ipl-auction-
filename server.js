@@ -6,7 +6,7 @@ const zlib = require('zlib');
 
 const players = require('./lib/players');
 const { RoomManager } = require('./lib/rooms');
-const { isConfigured, ping, pool } = require('./lib/db');
+const { isConfigured, ping, pool, ensureSchema } = require('./lib/db');
 
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
@@ -20,17 +20,68 @@ fs.mkdirSync(PHOTOS_DIR, { recursive: true });
 const rooms = new RoomManager({ players: master, photosDir: PHOTOS_DIR });
 
 // --- per-room SSE clients ---
-const roomClients = new Map(); // code -> Set<res>
+const roomClients = new Map(); // code -> Set<res>   (each res tagged with res._who)
+
+// Live presence, derived from the open SSE connections in a room. Every screen
+// declares who it is when it opens the stream (?role=&team=), so operator + teams
+// can see exactly who is in the room before the auction starts.
+function presenceFor(code) {
+  const set = roomClients.get(code);
+  const teams = new Set();
+  let operators = 0, screens = 0, viewers = 0;
+  if (set) {
+    for (const res of set) {
+      const w = res._who || {};
+      if (w.role === 'team' && w.teamId != null) teams.add(Number(w.teamId));
+      else if (w.role === 'operator') operators++;
+      else if (w.role === 'screen') screens++;
+      else viewers++;
+    }
+  }
+  return { teams: [...teams], operators, screens, viewers, total: set ? set.size : 0 };
+}
+// Attach live presence to every state payload so all screens render the lobby.
+function outbound(code, snap) { return { ...snap, presence: presenceFor(code) }; }
+
 function roomBroadcast(code, snap) {
   const set = roomClients.get(code);
   if (!set || !set.size) return;
-  const payload = `data: ${JSON.stringify(snap)}\n\n`;
+  const payload = `data: ${JSON.stringify(outbound(code, snap))}\n\n`;
   for (const res of set) { try { res.write(payload); } catch (e) { /* noop */ } }
 }
-// Wire a room's engine so every state change fans out to that room's screens.
+
+// Broadcast coalescing. A hot bidding war can fire ~10 bids/sec (bursts even faster).
+// Each bid is applied + acked instantly; the *visual* fan-out is throttled to a smooth
+// frame rate so we never build/stringify a full snapshot and write to every screen more
+// than ~BROADCAST_MS apart. It's leading-edge (first change pushes immediately) with a
+// trailing flush that always sends the LATEST snapshot — no bid is lost, since snapshots
+// are full state and carry recent bid history. Result: continuous bidding stays fluid on
+// every phone even on weak Wi-Fi.
+const BROADCAST_MS = 40; // ~25 frames/sec max
+const _bc = new Map();   // code -> { last:ms, timer:Timeout|null }
+function flushBroadcast(code) {
+  const room = rooms.get(code);
+  if (room) roomBroadcast(code, room.engine.snapshot());
+}
+function scheduleBroadcast(code) {
+  let st = _bc.get(code);
+  if (!st) { st = { last: 0, timer: null }; _bc.set(code, st); }
+  if (st.timer) return;                                  // a trailing flush is already queued → it'll send the latest
+  const since = Date.now() - st.last;
+  if (since >= BROADCAST_MS) {                            // leading edge: push now
+    st.last = Date.now();
+    flushBroadcast(code);
+  } else {                                                // within the window: coalesce into one trailing push
+    st.timer = setTimeout(() => { st.timer = null; st.last = Date.now(); flushBroadcast(code); }, BROADCAST_MS - since);
+    if (st.timer.unref) st.timer.unref();
+  }
+}
+// Re-push current state to a room (used when presence changes but engine state didn't).
+function pushPresence(code) { scheduleBroadcast(code); }
+// Wire a room's engine so every state change fans out to that room's screens (coalesced).
 function wireRoom(room) {
   if (!roomClients.has(room.code)) roomClients.set(room.code, new Set());
-  room.engine.subscribe((snap) => roomBroadcast(room.code, snap));
+  room.engine.subscribe(() => scheduleBroadcast(room.code));
 }
 // Heartbeat. Real state changes are already pushed event-driven via _notify().
 // So here we only stream a fresh snapshot while a timer is COUNTING DOWN (for the
@@ -214,17 +265,30 @@ const server = http.createServer(async (req, res) => {
     const sub = mr[2];
     const engine = room.engine;
 
-    // SSE state stream (scoped to this room)
+    // SSE state stream (scoped to this room). The screen declares its identity so it
+    // registers in the room's live presence: ?role=team&team=ID&token=... | role=operator&key=... | role=screen
     if (req.method === 'GET' && sub === 'stream') {
+      const role = url.searchParams.get('role') || 'viewer';
+      let who = { role: 'viewer', teamId: null };
+      if (role === 'team') {
+        const teamId = room.verifyTeam(url.searchParams.get('token'));
+        if (teamId != null) who = { role: 'team', teamId };
+      } else if (role === 'operator') {
+        if (room.hostOk(url.searchParams.get('key'))) who = { role: 'operator', teamId: null };
+      } else if (role === 'screen') {
+        who = { role: 'screen', teamId: null };
+      }
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
       res.write(`retry: 2000\n\n`);
-      res.write(`data: ${JSON.stringify(engine.snapshot())}\n\n`);
+      res._who = who;
       const set = roomClients.get(room.code) || (roomClients.set(room.code, new Set()), roomClients.get(room.code));
       set.add(res);
-      req.on('close', () => set.delete(res));
+      res.write(`data: ${JSON.stringify(outbound(room.code, engine.snapshot()))}\n\n`);
+      pushPresence(room.code); // tell everyone else this screen just joined
+      req.on('close', () => { set.delete(res); pushPresence(room.code); });
       return;
     }
-    if (req.method === 'GET' && sub === 'state') return sendJSON(res, 200, engine.snapshot());
+    if (req.method === 'GET' && sub === 'state') return sendJSON(res, 200, outbound(room.code, engine.snapshot()));
     if (req.method === 'GET' && sub === 'history') {
       const lim = Math.min(1000, Math.max(1, Number(url.searchParams.get('limit')) || 300));
       return sendJSON(res, 200, { events: engine.history(lim) });
@@ -250,17 +314,34 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, warning ? { ok: true, rev: result.rev, warning } : { ok: true, rev: result.rev });
     }
 
-    // Team CLAIM (FCFS, no PIN) — anyone with the join link
-    if (req.method === 'POST' && sub === 'team/claim') {
+    // Team JOIN / REJOIN with passcode — works from any device, any time.
+    if (req.method === 'POST' && (sub === 'team/join' || sub === 'team/claim')) {
       const ip = clientIp(req);
       if (claimThrottled(ip)) return sendJSON(res, 429, { ok: false, error: 'Too many attempts — wait a minute' });
       const body = await readBody(req);
       if (!body || body.teamId == null) return sendJSON(res, 400, { ok: false, error: 'Pick a team' });
+      if (!body.pin) return sendJSON(res, 400, { ok: false, error: 'Enter your team passcode' });
       try {
-        const r = await room.claim(Number(body.teamId));
-        if (!r.ok) return sendJSON(res, 409, { ok: false, error: r.error || 'Could not claim' });
+        const r = await room.join(Number(body.teamId), String(body.pin));
+        if (!r.ok) return sendJSON(res, 401, { ok: false, error: r.error || 'Could not join' });
         return sendJSON(res, 200, r);
-      } catch (e) { console.error('[claim]', e.message); return sendJSON(res, 500, { ok: false, error: 'Could not claim team' }); }
+      } catch (e) { console.error('[join]', e.message); return sendJSON(res, 500, { ok: false, error: 'Could not join team' }); }
+    }
+
+    // Operator: list every team's passcode + claimed flag (for handing out access).
+    if (req.method === 'GET' && sub === 'teams-auth') {
+      if (!room.hostOk(req.headers['x-op-key'])) return sendJSON(res, 401, { ok: false, error: 'Invalid auctioneer key' });
+      try { return sendJSON(res, 200, { ok: true, teams: await room.pinList() }); }
+      catch (e) { console.error('[teams-auth]', e.message); return sendJSON(res, 500, { ok: false, error: 'Could not load passcodes' }); }
+    }
+
+    // Operator: rotate a team's passcode (also boots that team's current session).
+    if (req.method === 'POST' && sub === 'team/regen-pin') {
+      if (!room.hostOk(req.headers['x-op-key'])) return sendJSON(res, 401, { ok: false, error: 'Invalid auctioneer key' });
+      const body = await readBody(req);
+      if (!body || body.teamId == null) return sendJSON(res, 400, { ok: false, error: 'Bad request' });
+      try { return sendJSON(res, 200, await room.regenPin(Number(body.teamId))); }
+      catch (e) { console.error('[regen-pin]', e.message); return sendJSON(res, 500, { ok: false, error: 'Could not regenerate passcode' }); }
     }
 
     // Team RELEASE (auctioneer reassigns / frees a team)
@@ -328,6 +409,7 @@ process.on('uncaughtException', (e) => console.error('[uncaughtException]', (e &
   if (!isConfigured()) { console.error('\n  ✗ PGPASSWORD not set. Add it to .env (see .env.example).\n'); process.exit(1); }
   const pg = await ping();
   if (!pg.ok) { console.error('\n  ✗ Cannot reach Postgres:', pg.error, '\n'); process.exit(1); }
+  try { await ensureSchema(); } catch (e) { console.error('  ✗ ensureSchema failed:', e.message); process.exit(1); }
   const n = await rooms.loadAll();
   for (const room of rooms.rooms.values()) wireRoom(room);
   console.log(`[boot] players: ${master.list.length} | rooms restored: ${n} | db: ${pg.version.split(' ').slice(0, 2).join(' ')}`);

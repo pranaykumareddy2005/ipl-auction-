@@ -29,6 +29,47 @@ const DEFAULT_TEAMS = [
 ];
 let teamDraft = DEFAULT_TEAMS.map((t,i)=>({id:i,name:t[0],short:t[1],color:t[2],owner:'',purseL:12000}));
 
+let pinMap = {};        // teamId -> passcode (loaded from the host-only endpoint)
+let _presSig = '';      // last-seen presence signature (presence changes don't bump rev)
+
+// Load every team's passcode (host key required). Safe to call repeatedly.
+async function loadPins(){
+  if(!getKey()) return;
+  const r = await Bus.teamsAuth(getKey());
+  if(r && r.ok){ pinMap={}; (r.teams||[]).forEach(t=>{ pinMap[Number(t.teamId)] = t.pin; }); if(snap) renderLobby(snap); }
+}
+
+// Room lobby: who is online + each team's passcode (shown on the setup screen).
+function renderLobby(s){
+  const box = $('lobbyList'); if(!box) return;
+  const teams = (s && s.teams) || [];
+  const online = new Set(((s && s.presence && s.presence.teams) || []).map(Number));
+  const ops = (s && s.presence && s.presence.operators) || 0;
+  if(!teams.length){ box.innerHTML='<div class="dim" style="padding:10px">Save your teams above, then each team\'s passcode appears here.</div>';
+    $('lobbySummary').textContent='No teams yet — save teams to generate passcodes.'; return; }
+  const onCount = teams.filter(t=>online.has(Number(t.teamId))).length;
+  $('lobbySummary').innerHTML = `<b style="color:var(--gold)">${onCount}</b> of ${teams.length} teams online`
+    + ` · operator console ${ops>0?'<b style="color:#7ee0a1">connected</b>':'offline'}`;
+  box.innerHTML = teams.map(t=>{
+    const id=Number(t.teamId); const isOn=online.has(id);
+    const pin = pinMap[id] || '——';
+    return `<div class="qitem">
+      <span class="sw" style="width:12px;height:12px;border-radius:3px;background:${esc(t.color||'#888')}"></span>
+      <span class="nm">${esc(t.name)}
+        <span class="tag" style="background:${isOn?'#123a24':'#2a2030'};color:${isOn?'#7ee0a1':'var(--mut)'};font-weight:700">${isOn?'● Online':(t.claimed?'○ Claimed · away':'○ Not joined')}</span>
+      </span>
+      <span class="mono" style="letter-spacing:2px;font-size:15px">${esc(pin)}</span>
+      <button class="btn sm ghost" onclick="doRegen(${id})">Regenerate</button>
+    </div>`;
+  }).join('');
+}
+window.doRegen = async(teamId)=>{
+  if(!confirm('New passcode for this team? Their current device (if any) will be signed out.')) return;
+  const r = await Bus.regenPin(teamId, getKey());
+  if(r && r.ok){ pinMap[Number(teamId)] = r.pin; if(snap) renderLobby(snap); Bus.toast('New passcode: '+r.pin,'ok'); }
+  else { Bus.toast((r&&r.error)||'Could not regenerate','err'); if(r&&/auctioneer key/i.test(r.error||'')) showKey(); }
+};
+
 // ---------- command wrapper ----------
 async function cmd(name, payload) {
   const r = await Bus.command(name, payload, getKey());
@@ -50,8 +91,10 @@ async function boot() {
   const pool = await Bus.getJSON(Bus.base() + '/pool');
   poolOrder = pool.order.slice();
   renderCatalog(); renderQueueEditor();
-  Bus.connect(onState, on => Bus.connBadge(on));
+  conn = Bus.connect(onState, on => Bus.connBadge(on), { role:'operator', key:getKey() });
+  loadPins();
 }
+let conn = null;
 
 // ---------- SHARE panel ----------
 function initShare() {
@@ -82,6 +125,11 @@ let _lastRev = -1, _lastPhase = '';
 function onState(s) {
   snap = s;
   timerSync(s); // keep the countdown in sync cheaply, every snapshot
+  // Presence (who's online) changes WITHOUT bumping rev, so refresh the lobby +
+  // live team list whenever it moves, independent of the heavy-rebuild guard below.
+  const pres = s.presence || { teams: [], operators: 0 };
+  const psig = (pres.teams || []).slice().sort((a,b)=>a-b).join(',') + '|' + pres.operators;
+  if (psig !== _presSig) { _presSig = psig; renderLobby(s); if (s.phase !== 'setup') renderTeamsList(s); }
   // Skip the heavy DOM rebuild when nothing actually changed (e.g. per-second
   // timer ticks): rev only advances on real events. The 200ms timer loop still
   // updates the countdown locally.
@@ -99,6 +147,9 @@ function onState(s) {
   $('live').classList.toggle('hide', inSetup);
   if (inSetup) { $('poolCount').textContent = `(${poolOrder.length} players)`; syncSettingsForm(s); }
   else renderLive(s);
+  renderLobby(s);
+  // Teams may have just been (re)saved -> make sure their passcodes are loaded.
+  if ((s.teams||[]).length && Object.keys(pinMap).length < (s.teams||[]).length) loadPins();
 }
 
 // ================= SETUP: teams =================
@@ -258,12 +309,23 @@ function renderBidGrid(s) {
     </button>`;
   }).join('');
 }
+// Continuous bidding is expected. We only stop a team's taps from OVERLAPPING (one
+// request per team in flight); as soon as it returns, the next raise can fire. A late
+// tap after that team already leads is rejected by the server and swallowed silently,
+// so rapid card-raising never spams errors or double-counts.
+const _bidBusy = {};
 window.bid=async(teamId)=>{
-  const custom=$('customBid').value.trim();
-  const payload={teamId}; if(custom) payload.amountL=Number(custom);
-  if(snap&&snap.current) payload.expectedSr=snap.current.sr;   // don't bid on a player who just changed
-  const r=await cmd('placeBid',payload);
-  if(r.ok) $('customBid').value='';
+  if(_bidBusy[teamId]) return;
+  _bidBusy[teamId]=true;
+  try{
+    const custom=$('customBid').value.trim();
+    const payload={teamId}; if(custom) payload.amountL=Number(custom);
+    if(snap&&snap.current) payload.expectedSr=snap.current.sr;   // don't bid on a player who just changed
+    const r=await Bus.command('placeBid',payload,getKey());
+    if(r.ok){ $('customBid').value=''; }
+    else if(/already.*lead|leading bid/i.test(r.error||'')){ /* late tap after they already lead — no-op */ }
+    else { Bus.toast(r.error||'Rejected','err'); if(/auctioneer key/i.test(r.error||'')) showKey(); }
+  } finally { _bidBusy[teamId]=false; }
 };
 window.doSold=async()=>{ const custom=$('customBid').value.trim(); const payload={}; if(custom)payload.priceL=Number(custom);
   const r=await cmd('sold',payload); if(r.ok){ $('customBid').value=''; Bus.toast('Sold!','ok'); } };
@@ -303,11 +365,16 @@ function renderHeld(s){
     <button class="btn sm blue" onclick="cmd('setNext',{sr:${p.sr}})">Requeue next</button></div>`).join('')||'<div class="dim" style="padding:8px">None</div>';
 }
 function renderTeamsList(s){
+  const online=new Set(((s.presence&&s.presence.teams)||[]).map(Number));
   $('teamsList').innerHTML=s.teams.map(t=>{
-    const status = t.claimed
-      ? `<span class="tag" style="background:#123a24;color:#7ee0a1;font-weight:700">Claimed ✓</span>
+    const isOn=online.has(Number(t.teamId));
+    const status = isOn
+      ? `<span class="tag" style="background:#123a24;color:#7ee0a1;font-weight:700">● Online</span>
          <button class="btn sm red ghost" onclick="doRelease(${t.teamId})">Release</button>`
-      : `<span class="tag" style="background:#20263a;color:var(--mut)">Open</span>`;
+      : t.claimed
+      ? `<span class="tag" style="background:#3a2a12;color:#e0c07e;font-weight:700">Away</span>
+         <button class="btn sm red ghost" onclick="doRelease(${t.teamId})">Release</button>`
+      : `<span class="tag" style="background:#20263a;color:var(--mut)">Not joined</span>`;
     return `<div class="qitem">
     <span class="sw" style="width:12px;height:12px;border-radius:3px;background:${esc(t.color||'#888')}"></span>
     <span class="nm">${esc(t.name)} <span class="dim">· ${t.count}p · ${t.overseas}os</span></span>
@@ -440,6 +507,8 @@ window.doRestart=async()=>{
 
 // key modal
 function showKey(){ $('keyInput').value=''; $('keyModal').classList.remove('hide'); setTimeout(()=>$('keyInput').focus(),50); }
-window.saveKey=()=>{ const k=$('keyInput').value.trim(); if(!k){ Bus.toast('Enter the auctioneer key','err'); return; } setKey(k); $('keyModal').classList.add('hide'); Bus.toast('Key saved','ok'); };
+window.saveKey=()=>{ const k=$('keyInput').value.trim(); if(!k){ Bus.toast('Enter the auctioneer key','err'); return; } setKey(k); $('keyModal').classList.add('hide'); Bus.toast('Key saved','ok');
+  // Reconnect as an authenticated operator so presence + passcodes light up now.
+  if(conn) conn.close(); conn = Bus.connect(onState, on => Bus.connBadge(on), { role:'operator', key:getKey() }); loadPins(); };
 
 boot();

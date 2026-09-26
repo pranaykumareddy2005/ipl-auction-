@@ -119,6 +119,8 @@
   .tcard .tn{font-family:var(--f-head);font-weight:600;font-size:15px;display:flex;align-items:center;gap:8px;letter-spacing:.3px;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .tcard .swatch{width:11px;height:11px;border-radius:3px;flex:none;box-shadow:0 0 8px currentColor}
+  .tcard .onl{width:8px;height:8px;border-radius:50%;flex:none;background:#4a5169;box-shadow:none}
+  .tcard .onl.on{background:#2ecc71;box-shadow:0 0 9px #2ecc71}
   .tcard .rem{font-family:var(--f-display);font-size:24px;margin-top:7px;font-variant-numeric:tabular-nums;line-height:1;
     background:linear-gradient(120deg,#fff 30%,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
   .tcard .sub{font-size:11px;color:var(--mut);margin-top:4px}
@@ -416,11 +418,14 @@ function setPhoto(p, color){ fillPhoto($('pphoto'), p.name, color||'#3a4a80', p.
 
 function renderTeams(s){
   const lead=s.bidding?s.bidding.leadingTeamId:null;
+  const online=new Set(((s.presence&&s.presence.teams)||[]).map(Number));
   $('teams').innerHTML=s.teams.map(t=>{
     const c=Bus.esc(t.color||'#888');
+    const isOn=online.has(Number(t.teamId));
+    const dot=`<span class="onl ${isOn?'on':''}" title="${isOn?'Online':'Offline'}"></span>`;
     return `
     <div class="tcard ${t.teamId===lead?'lead':''}" style="--tc:${c}">
-      <div class="tn"><span class="swatch" style="background:${c};color:${c}"></span>${Bus.esc(t.name)}</div>
+      <div class="tn">${dot}<span class="swatch" style="background:${c};color:${c}"></span>${Bus.esc(t.name)}</div>
       <div class="rem mono">${Bus.fmtL(t.remaining)}</div>
       <div class="sub">${t.count} players · ${t.overseas} os · spent ${Bus.fmtL(t.spent)}</div>
     </div>`;}).join('');
@@ -462,7 +467,7 @@ if(!Bus.ROOM){
   $('roomtag').style.display=''; $('roomtagCode').textContent=Bus.ROOM;
   // load category colors (global config)
   Bus.getJSON('/api/players').then(d=>{window.__cats=d.cats;if(snap)render(snap);}).catch(()=>{});
-  Bus.connect(render, on=>Bus.connBadge(on));
+  Bus.connect(render, on=>Bus.connBadge(on), { role:'screen' });
 }
 </script>
 </body>
