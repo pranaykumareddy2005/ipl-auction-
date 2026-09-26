@@ -130,6 +130,13 @@ function onState(s) {
   const pres = s.presence || { teams: [], operators: 0 };
   const psig = (pres.teams || []).slice().sort((a,b)=>a-b).join(',') + '|' + pres.operators;
   if (psig !== _presSig) { _presSig = psig; renderLobby(s); if (s.phase !== 'setup') renderTeamsList(s); }
+  // DB-write health: warn the operator if writes are failing (don't restart mid-outage).
+  const dw = $('dbWarn');
+  if (dw) {
+    const bad = s.persist && s.persist.ok === false;
+    dw.style.display = bad ? 'block' : 'none';
+    if (bad) { const m = $('dbWarnMeta'); if (m) m.textContent = s.persist.pending ? `(${s.persist.pending} unsaved)` : ''; }
+  }
   // Skip the heavy DOM rebuild when nothing actually changed (e.g. per-second
   // timer ticks): rev only advances on real events. The 200ms timer loop still
   // updates the countdown locally.

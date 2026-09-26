@@ -85,6 +85,11 @@
 </style>
 </head>
 <body>
+<div id="dbWarn" style="display:none;position:sticky;top:0;z-index:200;background:#7a1420;color:#ffdce0;font-weight:700;
+  text-align:center;padding:10px 14px;font-size:14px;box-shadow:0 2px 12px rgba(0,0,0,.4)">
+  ⚠ Database offline — bids are still working live, but recent actions are NOT saved yet.
+  Do NOT restart the server or close this until it reconnects. <span id="dbWarnMeta" style="opacity:.85;font-weight:600"></span>
+</div>
 <div class="bar">
   <div class="brand"><div class="logo">IPL</div><div><small>Auctioneer</small><div class="brandttl" id="roundlbl">Auction 2026</div></div></div>
   <div class="actions">
