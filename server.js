@@ -141,7 +141,7 @@ function readBody(req) {
 // Static serving with an mtime-keyed cache (raw + pre-gzipped). Edits invalidate
 // automatically (mtime changes), so no stale files, but repeat loads are cheap.
 const staticCache = new Map(); // file -> {mtimeMs, raw, gz, ctype}
-function serveStatic(res, urlPath) {
+function serveStatic(req, res, urlPath) {
   let rel = urlPath === '/' ? '/index.html' : urlPath;
   rel = rel.split('?')[0];
   const file = path.join(PUBLIC_DIR, path.normalize(rel).replace(/^(\.\.[/\\])+/, ''));
@@ -153,11 +153,18 @@ function serveStatic(res, urlPath) {
       const raw = fs.readFileSync(file);
       const ctype = MIME[path.extname(file)] || 'application/octet-stream';
       const gz = /text|javascript|json|svg/.test(ctype) ? zlib.gzipSync(raw) : null;
-      ent = { mtimeMs: st.mtimeMs, raw, gz, ctype };
+      const etag = 'W/"' + st.size.toString(16) + '-' + Math.round(st.mtimeMs).toString(16) + '"';
+      ent = { mtimeMs: st.mtimeMs, raw, gz, ctype, etag };
       staticCache.set(file, ent);
     }
-    const isHtml = ent.ctype.startsWith('text/html');
-    const headers = { 'Content-Type': ent.ctype, 'Cache-Control': isHtml ? 'no-cache' : 'public, max-age=3600', Vary: 'Accept-Encoding' };
+    // Always revalidate so edits (during event prep / updates) are never served stale,
+    // but use ETag/If-None-Match so an UNCHANGED file returns a cheap 304 instead of a
+    // full re-download. This fixes the "old JS keeps running after an update" trap.
+    if ((req.headers['if-none-match'] || '') === ent.etag) {
+      res.writeHead(304, { ETag: ent.etag, 'Cache-Control': 'no-cache' });
+      return res.end();
+    }
+    const headers = { 'Content-Type': ent.ctype, 'Cache-Control': 'no-cache', ETag: ent.etag, 'Last-Modified': new Date(ent.mtimeMs).toUTCString(), Vary: 'Accept-Encoding' };
     if (res._gz && ent.gz) { headers['Content-Encoding'] = 'gzip'; res.writeHead(200, headers); return res.end(ent.gz); }
     res.writeHead(200, headers); res.end(ent.raw);
   });
@@ -230,7 +237,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Static assets / pages
-  if (req.method === 'GET' && !p.startsWith('/api/')) return serveStatic(res, p);
+  if (req.method === 'GET' && !p.startsWith('/api/')) return serveStatic(req, res, p);
 
   // Global player master (same for every room)
   if (req.method === 'GET' && p === '/api/players') return sendJSON(res, 200, { players: master.list, cats: master.cats, stars: master.stars });

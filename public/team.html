@@ -159,11 +159,8 @@
       <div class="subline" id="pursesub"></div></div>
   </div>
 
-  <!-- COMING UP -->
-  <div class="sec">
-    <div class="sechd">Coming up next (<span id="poolLeft">0</span> left)</div>
-    <div id="upnext"></div>
-  </div>
+  <!-- Coming-up list intentionally hidden on the team screen: captains shouldn't see
+       who's next, to keep each nomination a surprise. (Operator/projector still show it.) -->
 
   <!-- SQUAD -->
   <div class="sec">
@@ -308,16 +305,9 @@ function renderNumbers(s,t){
 }
 
 /* ---------- coming up ---------- */
-function renderUpNext(s){
-  $('poolLeft').textContent=s.counts.pool;
-  const q=s.queuePreview||[];
-  $('upnext').innerHTML = q.length ? q.slice(0,8).map((p,i)=>`<div class="up ${i===0?'first':''}">
-    <span class="n">${i+1}</span>
-    <span class="who">${Bus.esc(p.name)}${i===0?' <span class="tag" style="background:rgba(244,196,48,.2);color:var(--gold)">NEXT</span>':''}
-      <div class="role">${Bus.esc(p.role||'')}${p.country?(' · '+Bus.esc(p.country)):''}</div></span>
-    <span class="base">${Bus.fmtL(p.base)}</span></div>`).join('')
-    : `<div class="dim" style="padding:10px">${s.phase==='complete'?'Auction complete.':'No more players queued.'}</div>`;
-}
+// Deliberately a no-op on the team screen — the upcoming-players list is hidden from
+// captains so each nomination stays a surprise. Guarded so it's safe if called.
+function renderUpNext(s){ /* hidden on team view */ }
 
 /* ---------- squad ---------- */
 function renderSquad(t){
