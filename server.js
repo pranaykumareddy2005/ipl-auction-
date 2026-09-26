@@ -246,6 +246,9 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && p === '/api/rooms') {
     const ip = clientIp(req);
     if (createThrottled(ip)) return sendJSON(res, 429, { ok: false, error: 'Too many rooms created — try again later' });
+    // Reject a declared-oversized upload up front with a clean 413, instead of tearing
+    // down the socket mid-body (which surfaces to the client as an ECONNRESET).
+    if (Number(req.headers['content-length']) > 1e6) return sendJSON(res, 413, { ok: false, error: 'Request too large' });
     const body = await readBody(req);
     if (body && body.__tooLarge) return sendJSON(res, 413, { ok: false, error: 'Request too large' });
     try {

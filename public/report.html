@@ -73,7 +73,7 @@ async function load(){
 
   $('teams').innerHTML=R.teams.map(t=>`<div class="tpanel">
     <div class="thead" style="background:${Bus.esc(t.color||'#888')}">
-      <div><b>${Bus.esc(t.name)}</b><div style="font-size:12px">${t.count} players · ${t.overseas} overseas</div></div>
+      <div><b>${Bus.esc(t.name)}</b><div style="font-size:12px">${Bus.plural(t.count, 'player')} · ${t.overseas} overseas</div></div>
       <div style="text-align:right">
         <div class="r mono">${Bus.fmtL(t.spent)} spent</div><div style="font-size:12px">${Bus.fmtL(t.remaining)} left</div>
         <button class="btn sm ghost noprint" style="margin-top:6px" onclick="downloadTeamCSV(${t.id})">⬇ Squad CSV</button>

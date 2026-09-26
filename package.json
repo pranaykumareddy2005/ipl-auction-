@@ -10,7 +10,9 @@
     "simulate": "node scripts/simulate.js",
     "test": "node scripts/simulate.js",
     "loadtest": "node test/run.js",
-    "livetest": "node test/livetest.js"
+    "edgetest": "node test/stress-edge.js",
+    "livetest": "node test/livetest.js",
+    "breaktest": "node test/break-scenario.js"
   },
   "engines": {
     "node": ">=18"

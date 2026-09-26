@@ -168,7 +168,7 @@ function onState(s) {
   const inSetup = s.phase === 'setup';
   $('setup').classList.toggle('hide', !inSetup);
   $('live').classList.toggle('hide', inSetup);
-  if (inSetup) { $('poolCount').textContent = `(${poolOrder.length} players)`; syncSettingsForm(s); }
+  if (inSetup) { $('poolCount').textContent = `(${Bus.plural(poolOrder.length, 'player')})`; syncSettingsForm(s); }
   else renderLive(s);
   renderLobby(s);
   // Teams may have just been (re)saved -> make sure their passcodes are loaded.
@@ -243,7 +243,7 @@ function filteredCatalog() {
 function renderCatalog() {
   const list=filteredCatalog().slice(0,300);
   $('catalog').innerHTML = list.map(p=>rowCatalog(p)).join('') || '<div class="dim" style="padding:10px">No players — all added or none match.</div>';
-  $('poolCount').textContent=`(${poolOrder.length} players)`;
+  $('poolCount').textContent=`(${Bus.plural(poolOrder.length, 'player')})`;
 }
 function rowCatalog(p){
   const c='#'+((cats[catOf(p)]&&cats[catOf(p)].c)||'888');

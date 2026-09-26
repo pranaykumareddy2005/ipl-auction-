@@ -427,7 +427,7 @@ function renderTeams(s){
     <div class="tcard ${t.teamId===lead?'lead':''}" style="--tc:${c}">
       <div class="tn">${dot}<span class="swatch" style="background:${c};color:${c}"></span>${Bus.esc(t.name)}</div>
       <div class="rem mono">${Bus.fmtL(t.remaining)}</div>
-      <div class="sub">${t.count} players · ${t.overseas} os · spent ${Bus.fmtL(t.spent)}</div>
+      <div class="sub">${Bus.plural(t.count, 'player')} · ${t.overseas} os · spent ${Bus.fmtL(t.spent)}</div>
     </div>`;}).join('');
 }
 

@@ -10,10 +10,13 @@
 
   function fmtL(L) {
     L = Number(L) || 0;
+    if (L === 0) return '₹0';
     if (L >= 100) { const c = L / 100; return '₹' + (c % 1 === 0 ? c : c.toFixed(2)) + ' Cr'; }
     return '₹' + L + ' L';
   }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+  // "1 player" / "2 players" — pluralize a count with its noun.
+  function plural(n, word, wordPlural) { n = Number(n) || 0; return n + ' ' + (n === 1 ? word : (wordPlural || word + 's')); }
 
   async function getJSON(url) { const r = await fetch(url); return r.json(); }
 
@@ -132,7 +135,7 @@
   }
 
   g.Bus = {
-    ROOM, base, fmtL, esc, getJSON,
+    ROOM, base, fmtL, esc, plural, getJSON,
     createRoom, roomInfo,
     connect, state, command,
     joinTeam, releaseTeam, teamBid, teamsAuth, regenPin,
